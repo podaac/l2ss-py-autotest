@@ -39,7 +39,9 @@ jobs:
         run: |
           poetry install
           echo "new_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo $GITHUB_OUTPUT
   open_pr:
+    needs: find_new
     strategy:
       fail-fast: false
       max-parallel: 2
