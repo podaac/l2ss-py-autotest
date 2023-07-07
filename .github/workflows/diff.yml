@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: Verify New Associations
 
 # Controls when the workflow will run
 on: workflow_dispatch
@@ -9,8 +9,8 @@ on: workflow_dispatch
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  find_new:
+    name: Find new associations
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -39,3 +39,13 @@ jobs:
         run: |
           poetry install
           echo "new_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+  open_pr:
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        concept_id: ${{ fromJson(needs.find_new.outputs.new_associations) }}
+    runs-on: ubuntu-latest
+    name: Open PR for ${{ matrix.concept_id }}
+    steps:
+      - run: echo "${{ matrix.concept_id }}"
