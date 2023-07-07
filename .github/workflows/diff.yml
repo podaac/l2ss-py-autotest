@@ -19,7 +19,7 @@ jobs:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     outputs:
-      new_associations: ${{ fromJson(steps.diff.outputs.new_associations) }}
+      new_associations: ${{ steps.diff.outputs.new_associations }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
