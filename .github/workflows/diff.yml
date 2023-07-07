@@ -34,8 +34,10 @@ jobs:
           UAT_TOKEN_TEMP: ${{ secrets.UAT_TOKEN_TEMP }}
         run: |
           poetry install
-          echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
-          echo "new_ops_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          # echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          # echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo "new_uat_associations=[\"C1238687534-POCLOUD\"]" >> $GITHUB_OUTPUT
+          echo "new_ops_associations=[\"C1245295750-POCLOUD\"]" >> $GITHUB_OUTPUT
   open_pr_uat:
     needs: find_new
     strategy:
@@ -46,7 +48,24 @@ jobs:
     runs-on: ubuntu-latest
     name: UAT ${{ matrix.concept_id }}
     steps:
-      - run: echo "${{ matrix.concept_id }}"
+      - name: Update uat_associations
+        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/cmr/uat_associations.txt
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: Add ${{ matrix.concept_id }}
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: ${{ matrix.concept_id }}
+          delete-branch: true
+          title: UAT ${{ matrix.concept_id }}
+          body: |
+            New association between l2ss-py and ${{ matrix.concept_id }} found in UAT.
+            Beginning verification of collection.
+          labels: |
+            unverified
+          draft: true
   open_pr_ops:
     needs: find_new
     strategy:
