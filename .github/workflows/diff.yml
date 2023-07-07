@@ -11,15 +11,11 @@ on: workflow_dispatch
 jobs:
   find_new:
     name: Find new associations
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        env: [ "uat", "ops" ]
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     outputs:
-      new_associations: ${{ steps.diff.outputs.new_associations }}
+      new_uat_associations: ${{ steps.diff.outputs.new_uat_associations }}
+      new_ops_associations: ${{ steps.diff.outputs.new_ops_associations }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -38,16 +34,27 @@ jobs:
           UAT_TOKEN_TEMP: ${{ secrets.UAT_TOKEN_TEMP }}
         run: |
           poetry install
-          echo "new_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
-          echo $GITHUB_OUTPUT
-  open_pr:
+          echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo "new_ops_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+  open_pr_uat:
     needs: find_new
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        concept_id: ${{ fromJson(needs.find_new.outputs.new_associations) }}
+        concept_id: ${{ fromJson(needs.find_new.outputs.new_uat_associations) }}
     runs-on: ubuntu-latest
-    name: Open PR for ${{ matrix.concept_id }}
+    name: UAT ${{ matrix.concept_id }}
+    steps:
+      - run: echo "${{ matrix.concept_id }}"
+  open_pr_ops:
+    needs: find_new
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        concept_id: ${{ fromJson(needs.find_new.outputs.new_ops_associations) }}
+    runs-on: ubuntu-latest
+    name: OPS ${{ matrix.concept_id }}
     steps:
       - run: echo "${{ matrix.concept_id }}"
