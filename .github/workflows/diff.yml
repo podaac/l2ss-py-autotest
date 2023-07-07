@@ -66,7 +66,6 @@ jobs:
             Beginning verification of collection.
           labels: |
             unverified
-          draft: true
   open_pr_ops:
     needs: find_new
     strategy:
