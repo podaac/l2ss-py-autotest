@@ -48,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     name: UAT ${{ matrix.concept_id }}
     steps:
+      - uses: actions/checkout@v3
       - name: Update uat_associations
         run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/cmr/uat_associations.txt
       - name: Create Pull Request
@@ -76,4 +77,5 @@ jobs:
     runs-on: ubuntu-latest
     name: OPS ${{ matrix.concept_id }}
     steps:
+      - uses: actions/checkout@v3
       - run: echo "${{ matrix.concept_id }}"
