@@ -1,0 +1,11 @@
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/inspectionProfiles/Project_Default.xml
+/.idea/.gitignore
+/.idea/encodings.xml
+/.idea/l2ss-py-autotest.iml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/vcs.xml
+.pytest_cache
+/tests/out_report.xml
+__pycache__

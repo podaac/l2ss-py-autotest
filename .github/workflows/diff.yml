@@ -1,0 +1,113 @@
+# This workflow scans CMR every 5 minutes to check for new collection associations to the l2ss-py UMM-S record
+#  in UAT and OPS. If a new association is found, a PR is opened to add the new collection concept id to the
+#  cmr/*_associations.txt file.
+name: Scan For New Associations
+on:
+  workflow_dispatch:
+#  schedule:
+#    - cron: '*/5 * * * *'
+
+jobs:
+  find_new:
+    name: Find new associations
+    runs-on: ubuntu-latest
+    outputs:
+      new_uat_associations: ${{ steps.diff.outputs.new_uat_associations }}
+      new_ops_associations: ${{ steps.diff.outputs.new_ops_associations }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v2
+        with:
+          poetry-version: 1.5.1
+      - name: Run diff
+        id: diff
+        env:
+          UAT_TOKEN_TEMP: ${{ secrets.UAT_TOKEN_TEMP }}
+        run: |
+          poetry install
+          echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txtt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+  open_pr_uat:
+    needs: find_new
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        concept_id: ${{ fromJson(needs.find_new.outputs.new_uat_associations) }}
+    runs-on: ubuntu-latest
+    name: UAT ${{ matrix.concept_id }}
+    steps:
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v3
+      - name: Update uat_associations
+        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ steps.podaac-cicd.outputs.token }}
+          commit-message: Add ${{ matrix.concept_id }}
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: diff/uat/${{ matrix.concept_id }}
+          delete-branch: true
+          title: UAT ${{ matrix.concept_id }}
+          body: |
+            New association between l2ss-py and ${{ matrix.concept_id }} found in UAT.
+            Beginning verification of collection.
+          labels: |
+            unverified
+            autotest
+      - name: Enable Pull Request Automerge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
+  open_pr_ops:
+    needs: find_new
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        concept_id: ${{ fromJson(needs.find_new.outputs.new_ops_associations) }}
+    runs-on: ubuntu-latest
+    name: OPS ${{ matrix.concept_id }}
+    steps:
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v3
+      - name: Update ops_associations
+        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ steps.podaac-cicd.outputs.token }}
+          commit-message: Add ${{ matrix.concept_id }}
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: diff/ops/${{ matrix.concept_id }}
+          delete-branch: true
+          title: OPS ${{ matrix.concept_id }}
+          body: |
+            New association between l2ss-py and ${{ matrix.concept_id }} found in OPS.
+            Beginning verification of collection.
+          labels: |
+            unverified
+            autotest
+      - name: Enable Pull Request Automerge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
