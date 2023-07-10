@@ -28,5 +28,18 @@ jobs:
           TEST_ENV: ${{ steps.get-env-ccid.outputs.test_env }}
           CONCEPT_ID: ${{ steps.get-env-ccid.outputs.concept_id }}
         run: |
-          echo "$TEST_ENV"
-          echo "$CONCEPT_ID"
+          poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/out_report.xml
+      - name: Publish Test Results
+        permissions:
+          checks: write
+          # only needed unless run with comment_mode: off
+          pull-requests: write
+          # only needed for private repository
+          contents: read
+          # only needed for private repository
+          issues: read
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            test-results/out_report.xml
