@@ -61,7 +61,7 @@ jobs:
             Beginning verification of collection.
           labels: |
             unverified
-            new collection
+            autotest
   open_pr_ops:
     needs: find_new
     strategy:
@@ -90,4 +90,4 @@ jobs:
             Beginning verification of collection.
           labels: |
             unverified
-            new collection
+            autotest

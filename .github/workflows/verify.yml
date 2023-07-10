@@ -45,5 +45,7 @@ jobs:
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
+          json_test_case_results: true
+          check_name: Test Results for ${{ env.CONCEPT_ID }}
           files: |
             test-results/out_report.xml
