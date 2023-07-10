@@ -19,6 +19,12 @@ cf-xarray = "^0.8.3"
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 
+[tool.pytest.ini_options]
+junit_logging = "log"
+log_cli = "True"
+log_cli_level = "INFO"
+log_level = "INFO"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

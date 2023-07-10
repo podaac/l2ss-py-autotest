@@ -1,23 +1,20 @@
-# This is a basic workflow to help you get started with Actions
-
+# This workflow scans CMR every 5 minutes to check for new collection associations to the l2ss-py UMM-S record
+#  in UAT and OPS. If a new association is found, a PR is opened to add the new collection concept id to the
+#  cmr/*_associations.txt file.
 name: Scan For New Associations
+on:
+  workflow_dispatch:
+#  schedule:
+#    - cron: '*/5 * * * *'
 
-# Controls when the workflow will run
-on: workflow_dispatch
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   find_new:
     name: Find new associations
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
     outputs:
       new_uat_associations: ${{ steps.diff.outputs.new_uat_associations }}
       new_ops_associations: ${{ steps.diff.outputs.new_ops_associations }}
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
@@ -48,7 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Update uat_associations
-        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/cmr/uat_associations.txt
+        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v5
@@ -77,7 +74,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Update ops_associations
-        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/cmr/ops_associations.txt
+        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v5

@@ -6,3 +6,5 @@
 /.idea/misc.xml
 /.idea/modules.xml
 /.idea/vcs.xml
+.pytest_cache
+/tests/out_report.xml
