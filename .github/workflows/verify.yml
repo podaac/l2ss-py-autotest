@@ -19,8 +19,14 @@ jobs:
         with:
           poetry-version: 1.5.1
       - name: Get env and concept id
+        id: get-env-ccid
         run: |
           echo "test_env=$(python -c "print('${{ github.head_ref }}'.split('/')[1])")" >> $GITHUB_OUTPUT
           echo "concept_id=$(python -c "print('${{ github.head_ref }}'.split('/')[2])")" >> $GITHUB_OUTPUT
-          echo $test_env
-          echo $concept_id
+      - name: Execute tests
+        env:
+          TEST_ENV: ${{ steps.get-env-ccid.outputs.test_env }}
+          CONCEPT_ID: ${{ steps.get-env-ccid.outputs.concept_id }}
+        run: |
+          echo "$TEST_ENV"
+          echo "$CONCEPT_ID"
