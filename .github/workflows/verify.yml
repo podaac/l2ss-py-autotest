@@ -1,0 +1,27 @@
+# This workflow ...
+name: Verify New Associations
+on:
+  pull_request:
+    paths:
+      - 'tests/cmr/ops_associations.txt'
+      - 'tests/cmr/uat_associations.txt'
+
+jobs:
+  verify_collection:
+    name: Verify ${{ github.event.pull_request.title }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v2
+        with:
+          poetry-version: 1.5.1
+      - name: Get env and concept id
+        run: |
+          echo "test_env=$(python -c 'print(\"${{ github.event.pull_request.title }}\".split(\" \")[0])')" >> $GITHUB_OUTPUT
+          echo "concept_id=$(python -c 'print(\"${{ github.event.pull_request.title }}\".split(\" \")[1])')" >> $GITHUB_OUTPUT
+          echo $test_env
+          echo concept_id
