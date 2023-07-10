@@ -53,7 +53,7 @@ jobs:
           commit-message: Add ${{ matrix.concept_id }}
           committer: GitHub <noreply@github.com>
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
-          branch: ${{ matrix.concept_id }}
+          branch: diff/uat/${{ matrix.concept_id }}
           delete-branch: true
           title: UAT ${{ matrix.concept_id }}
           body: |
@@ -82,7 +82,7 @@ jobs:
           commit-message: Add ${{ matrix.concept_id }}
           committer: GitHub <noreply@github.com>
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
-          branch: ${{ matrix.concept_id }}
+          branch: diff/ops/${{ matrix.concept_id }}
           delete-branch: true
           title: OPS ${{ matrix.concept_id }}
           body: |

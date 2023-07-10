@@ -2,12 +2,15 @@
 name: Verify New Associations
 on:
   pull_request:
-    paths:
-      - 'tests/cmr/ops_associations.txt'
-      - 'tests/cmr/uat_associations.txt'
+    branches:
+      - 'diff/ops/**'
+      - 'diff/uat/**'
 
 jobs:
   verify_collection:
+    if: |
+        ${{ startsWith(github.head_ref, 'diff/uat') }}      ||
+        ${{ startsWith(github.head_ref, 'diff/ops') }}
     name: Verify ${{ github.event.pull_request.title }}
     runs-on: ubuntu-latest
     steps:
@@ -21,7 +24,7 @@ jobs:
           poetry-version: 1.5.1
       - name: Get env and concept id
         run: |
-          echo "test_env=$(python -c 'print(\"${{ github.event.pull_request.title }}\".split(\" \")[0])')" >> $GITHUB_OUTPUT
-          echo "concept_id=$(python -c 'print(\"${{ github.event.pull_request.title }}\".split(\" \")[1])')" >> $GITHUB_OUTPUT
+          echo "test_env=$(python -c 'print(\"${{ github.head_ref }}\".split(\"/\")[1])')" >> $GITHUB_OUTPUT
+          echo "concept_id=$(python -c 'print(\"${{ github.head_ref }}\".split(\"/\")[2])')" >> $GITHUB_OUTPUT
           echo $test_env
-          echo concept_id
+          echo $concept_id
