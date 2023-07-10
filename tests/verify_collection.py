@@ -244,7 +244,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, original_granu
     east = east - abs(.05 * (east - west))
 
     # Build harmony request
-    harmony_client = harmony.Client(env=harmony_env)
+    harmony_client = harmony.Client(env=harmony_env, auth=(os.environ['CMR_USER'], os.environ['CMR_PASS']))
     request_bbox = harmony.BBox(w=west, s=south, e=east, n=north)
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection, spatial=request_bbox,
