@@ -14,11 +14,6 @@ import xarray
 from requests.auth import HTTPBasicAuth
 
 
-# @pytest.fixture(scope="session")
-# def collection_concept_id(pytestconfig):
-#     return pytestconfig.getoption("concept_id")
-
-
 @pytest.fixture(scope="session")
 def env(pytestconfig):
     return pytestconfig.getoption("env")
@@ -83,7 +78,7 @@ def bearer_token(env: str, request_session: requests.Session) -> str:
 
 
 @pytest.fixture(scope="function")
-def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str) -> dict:
+def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str, request_session) -> dict:
     '''
     This fixture defines the strategy used for picking a granule from a collection for testing
 
@@ -97,10 +92,9 @@ def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str) -
     -------
     umm_json for selected granule
     '''
-    cmr_url = f"{cmr_mode}granules.umm_json?collection_concept_id={collection_concept_id}&sort_key=-start_date&token={bearer_token}&page_size=1"
+    cmr_url = f"{cmr_mode}granules.umm_json?collection_concept_id={collection_concept_id}&sort_key=-start_date&page_size=1"
 
-    with requests.Session() as s:
-        response_json = s.get(cmr_url).json()
+    response_json = request_session.get(cmr_url, headers={'Authorization': f'Bearer {bearer_token}'}).json()
 
     if 'items' in response_json and len(response_json['items']) > 0:
         return response_json['items'][0]
@@ -109,15 +103,14 @@ def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str) -
 
 
 @pytest.fixture(scope="function")
-def original_granule_localpath(granule_json: dict, tmp_path) -> pathlib.Path:
+def original_granule_localpath(granule_json: dict, tmp_path, bearer_token: str, request_session: requests.Session) -> pathlib.Path:
     urls = granule_json['umm']['RelatedUrls']
-    print(urls)
 
     def download_file(url):
         local_filename = tmp_path.joinpath(f"{granule_json['meta']['concept-id']}_original_granule.nc")
-        with requests.get(url, stream=True) as r:
-            with open(local_filename, 'wb') as f:
-                shutil.copyfileobj(r.raw, f)
+        response = request_session.get(url, headers={'Authorization': f'Bearer {bearer_token}'}, stream=True)
+        with open(local_filename, 'wb') as f:
+            shutil.copyfileobj(response.raw, f)
         return local_filename
 
     granule_url = None
