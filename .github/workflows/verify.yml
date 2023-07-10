@@ -20,7 +20,7 @@ jobs:
           poetry-version: 1.5.1
       - name: Get env and concept id
         run: |
-          echo "test_env=$(python -c \"print('${{ github.head_ref }}'.split('/')[1])\")" >> $GITHUB_OUTPUT
-          echo "concept_id=$(python -c \"print('${{ github.head_ref }}'.split('/')[2])\")" >> $GITHUB_OUTPUT
+          echo "test_env=$(python -c "print('${{ github.head_ref }}'.split('/')[1])")" >> $GITHUB_OUTPUT
+          echo "concept_id=$(python -c "print('${{ github.head_ref }}'.split('/')[2])")" >> $GITHUB_OUTPUT
           echo $test_env
           echo $concept_id
