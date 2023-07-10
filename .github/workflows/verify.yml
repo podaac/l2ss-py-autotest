@@ -35,6 +35,9 @@ jobs:
         env:
           TEST_ENV: ${{ steps.get-env-ccid.outputs.test_env }}
           CONCEPT_ID: ${{ steps.get-env-ccid.outputs.concept_id }}
+          CMR_USER: ${{ secrets.CMR_USER }}
+          CMR_PASS: ${{ secrets.CMR_PASS }}
+
         run: |
           poetry install
           poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/out_report.xml
