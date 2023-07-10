@@ -1,10 +1,6 @@
 # This workflow ...
 name: Verify New Associations
-on:
-  pull_request:
-    branches:
-      - 'diff/ops/**'
-      - 'diff/uat/**'
+on: pull_request
 
 jobs:
   verify_collection:
