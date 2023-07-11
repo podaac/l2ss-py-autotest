@@ -32,6 +32,7 @@ jobs:
           echo "test_env=$(python -c "print('${{ github.head_ref }}'.split('/')[1])")" >> $GITHUB_OUTPUT
           echo "concept_id=$(python -c "print('${{ github.head_ref }}'.split('/')[2])")" >> $GITHUB_OUTPUT
       - name: Execute tests
+        id: run-tests
         env:
           TEST_ENV: ${{ steps.get-env-ccid.outputs.test_env }}
           CONCEPT_ID: ${{ steps.get-env-ccid.outputs.concept_id }}
@@ -40,17 +41,20 @@ jobs:
 
         run: |
           poetry install
-          poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/out_report.xml
+          poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/$CONCEPT_ID_report.xml --html=$GITHUB_WORKSPACE/test-results/$CONCEPT_ID_report.html
+          echo "xml_report=test-results/$CONCEPT_ID_report.xml" >> $GITHUB_OUTPUT
+          echo "html_report=test-results/$CONCEPT_ID_report.html" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v2
         if: always()
         with:
           name: test-results
-          path: test-results/out_report.xml
+          path: ${{ steps.run-tests.outputs.html_report }}
       - name: Publish Test Results
         uses: mikepenz/action-junit-report@v3
         if: always()
         with:
+          commit: ${{github.head_sha}}
           check_name: Test Results for ${{ steps.get-env-ccid.outputs.concept_id }}
           include_passed: true
           detailed_summary: true
-          report_paths: test-results/out_report.xml
+          report_paths: ${{ steps.run-tests.outputs.xml_report }}
