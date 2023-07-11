@@ -14,6 +14,15 @@ except KeyError:
     raise KeyError(f'CMR_PASS environment variable is required')
 
 
+@pytest.hookimpl(trylast=True)
+def pytest_terminal_summary(session, _):
+    # Use custom exit code when any test is skipped so CI is able to differentiate a partial pass
+    reporter = session.config.pluginmanager.get_plugin('terminalreporter')
+
+    if 'skipped' in reporter.stats and reporter.stats['skipped'] > 0:
+        session.exitstatus = 30
+
+
 def pytest_addoption(parser):
     parser.addoption("--env", action="store", choices=['uat', 'ops'], help="Environment to use for testing",
                      required=True)
@@ -36,6 +45,7 @@ def pytest_generate_tests(metafunc):
         collection_concept_id = metafunc.config.option.concept_id
         if 'collection_concept_id' in metafunc.fixturenames and collection_concept_id is not None:
             metafunc.parametrize("collection_concept_id", [collection_concept_id])
+
 
 @pytest.fixture(scope="session", autouse=True)
 def log_global_env_facts(record_testsuite_property, request):
