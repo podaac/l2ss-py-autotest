@@ -40,18 +40,16 @@ jobs:
           CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
           poetry install
-          poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/${CONCEPT_ID}_report.xml --html=$GITHUB_WORKSPACE/test-results/${CONCEPT_ID}_report.html
-          echo "xml_report=test-results/${{ steps.get-env-ccid.outputs.concept_id }}_report.xml" >> $GITHUB_OUTPUT
-          echo "html_report=test-results/${{ steps.get-env-ccid.outputs.concept_id }}_report.html" >> $GITHUB_OUTPUT
+          poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html
       - uses: actions/upload-artifact@v2
         if: always()
         with:
           name: test-results
-          path: ${{ steps.run-tests.outputs.html_report }}
+          path: test-results/**
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
           report_suite_logs: info
           check_name: Test Results for ${{ steps.get-env-ccid.outputs.concept_id }}
-          files: ${{ steps.run-tests.outputs.xml_report }}
+          files: test-results/test_report.xml
