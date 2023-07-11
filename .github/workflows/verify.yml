@@ -42,8 +42,8 @@ jobs:
         run: |
           poetry install
           poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/$CONCEPT_ID_report.xml --html=$GITHUB_WORKSPACE/test-results/$CONCEPT_ID_report.html
-          echo "xml_report=test-results/$CONCEPT_ID_report.xml" >> $GITHUB_OUTPUT
-          echo "html_report=test-results/$CONCEPT_ID_report.html" >> $GITHUB_OUTPUT
+          echo "xml_report=test-results/${CONCEPT_ID}_report.xml" >> $GITHUB_OUTPUT
+          echo "html_report=test-results/${CONCEPT_ID}_report.html" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v2
         if: always()
         with:
