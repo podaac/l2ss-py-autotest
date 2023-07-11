@@ -4,6 +4,8 @@ on: pull_request
 
 jobs:
   verify_collection:
+    outputs:
+      test_results: ${{ steps.test-results.outputs.json }}
     permissions:
       checks: write
       # only needed unless run with comment_mode: off
@@ -40,7 +42,7 @@ jobs:
           CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
           poetry install
-          poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html
+          poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
       - uses: actions/upload-artifact@v2
         if: always()
         with:
@@ -51,10 +53,60 @@ jobs:
         if: always()
         with:
           report_suite_logs: info
-          check_name: Test Results for ${{ steps.get-env-ccid.outputs.concept_id }}
+          check_name: Tested with Harmony
+          comment_title: Test Results for ${{ steps.get-env-ccid.outputs.concept_id }}
           files: test-results/test_report.xml
-      - name: Conclusion
-        run: |
-          echo "Passed is ${{ fromJSON( steps.test-results.outputs.json ).stats.tests_succ }}"
-          echo "Failed is ${{ fromJSON( steps.test-results.outputs.json ).stats.tests_fail }}"
-          echo "Skipped is ${{ fromJSON( steps.test-results.outputs.json ).stats.tests_skip }}"
+  tests_pass:
+    needs: verify_collection
+    name: Merge Pull Request
+    runs-on: ubuntu-latest
+    if: ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.json ).stats.tests }}
+    steps:
+      - uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            unverified
+      - name: add labels
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            verified
+  tests_fail:
+    needs: verify_collection
+    name: Fail Pull Request
+    runs-on: ubuntu-latest
+    if: ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_fail > 0 }}
+    steps:
+      - uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            unverified
+      - name: add labels
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            failed verification
+            bug
+  tests_skipped:
+    needs: verify_collection
+    name: Update Pull Request
+    runs-on: ubuntu-latest
+    if: ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_skip > 0 }}
+    steps:
+      - uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            unverified
+      - name: add labels
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            unverified
+      - uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            **Action Needed**
+            Unable to verify collection because ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_skip > 0 }} test(s) were skipped.
+            Open the status check to view the logs from the test run and determine why tests were skipped.
+            If there is a justifiable reason, add a comment here and manually merge this PR to accept this unverified association.
+            Otherwise, fix the problem that caused the test to be skipped and rerun verification.

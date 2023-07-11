@@ -91,3 +91,5 @@ jobs:
           labels: |
             unverified
             autotest
+      - name: Enable Pull Request Automerge
+        run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
