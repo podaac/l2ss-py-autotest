@@ -1,6 +1,8 @@
 # This workflow ...
 name: Verify New Associations
-on: pull_request
+on:
+  pull_request:
+
 
 jobs:
   verify_collection:
@@ -64,21 +66,21 @@ jobs:
           name: test-results
           path: test-results/**
 
-#  tests_pass:
-#    needs: verify_collection
-#    name: Merge Pull Request
-#    runs-on: ubuntu-latest
-#    if: fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.test_results ).stats.tests
-#    steps:
-#      - uses: actions-ecosystem/action-remove-labels@v1
-#        with:
-#          labels: |
-#            unverified
-#      - name: add labels
-#        uses: actions-ecosystem/action-add-labels@v1
-#        with:
-#          labels: |
-#            verified
+  tests_pass:
+    needs: verify_collection
+    name: Merge Pull Request
+    runs-on: ubuntu-latest
+    if: needs.verify_collection.outputs.all_tests_passed
+    steps:
+      - uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            unverified
+      - name: add labels
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            verified
   tests_fail:
     needs: verify_collection
     name: Fail Pull Request
@@ -100,26 +102,26 @@ jobs:
           message: |
             **Action Needed**
             Tests have failed. Open the status checks to view the logs and review the failure.
-#  tests_skipped:
-#    needs: verify_collection
-#    name: Update Pull Request
-#    runs-on: ubuntu-latest
-#    if: fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_skip > 0
-#    steps:
-#      - uses: actions-ecosystem/action-remove-labels@v1
-#        with:
-#          labels: |
-#            unverified
-#      - name: add labels
-#        uses: actions-ecosystem/action-add-labels@v1
-#        with:
-#          labels: |
-#            unverified
-#      - uses: mshick/add-pr-comment@v2
-#        with:
-#          message: |
-#            **Action Needed**
-#            Unable to verify collection because ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_skip > 0 }} test(s) were skipped.
-#            Open the status check to view the logs from the test run and determine why tests were skipped.
-#            If there is a justifiable reason, add a comment here and manually merge this PR to accept this unverified association.
-#            Otherwise, fix the problem that caused the test to be skipped and rerun verification.
+  tests_skipped:
+    needs: verify_collection
+    name: Update Pull Request
+    runs-on: ubuntu-latest
+    if: needs.verify_collection.outputs.any_test_skipped
+    steps:
+      - uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            unverified
+      - name: add labels
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: |
+            unverified
+      - uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            **Action Needed**
+            Unable to verify collection because ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_skip > 0 }} test(s) were skipped.
+            Open the status check to view the logs from the test run and determine why tests were skipped.
+            If there is a justifiable reason, add a comment here and manually merge this PR to accept this unverified association.
+            Otherwise, fix the problem that caused the test to be skipped and rerun verification.
