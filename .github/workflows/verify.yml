@@ -45,13 +45,12 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: $GITHUB_WORKSPACE/test-results/out_report.xml
+          path: test-results/out_report.xml
       - name: Publish Test Results
         uses: mikepenz/action-junit-report@v3
         if: always()
         with:
-          artifact: test-results
           check_name: Test Results for ${{ steps.get-env-ccid.outputs.concept_id }}
           include_passed: true
           detailed_summary: true
-          report_paths: $GITHUB_WORKSPACE/test-results/out_report.xml
+          report_paths: test-results/out_report.xml
