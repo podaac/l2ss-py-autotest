@@ -20,6 +20,7 @@ l2ss-py = "^2.4.0"
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 pytest-html = "^3.2.0"
+pytest-timeout = "^2.1.0"
 
 [tool.pytest.ini_options]
 junit_logging = "log"

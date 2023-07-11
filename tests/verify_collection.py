@@ -270,8 +270,9 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
     pytest.fail(f"Unable to find latitude and longitude variables.")
 
 
+@pytest.mark.timeout(300)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token, request_session):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
@@ -284,8 +285,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     east = east - abs(.05 * (east - west))
 
     # Build harmony request
-    harmony_client = harmony.Client(env=harmony_env, token=bearer_token, should_validate_auth=False)
-    harmony_client.session = request_session
+    harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
     request_bbox = harmony.BBox(w=west, s=south, e=east, n=north)
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection, spatial=request_bbox,
@@ -294,6 +294,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     # Submit harmony request and download result
     job_id = harmony_client.submit(harmony_request)
+    logging.info("Submitted harmony job %s", job_id)
     harmony_client.wait_for_processing(job_id, show_progress=True)
     subsetted_filepath = None
     for filename in [file_future.result()
@@ -323,8 +324,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     else:
         # Can't find a science var in UMM-V, just pick one
         science_var_name = next(iter([v for v in subsetted_ds.data_vars if
-                                      str(v) not in subsetted_ds.cf[['latitude']] and str(v) not in subsetted_ds.cf[
-                                          ['longitude']]]))
+                                      str(v) not in lat_var_name and str(v) not in lon_var_name]))
 
     var_ds = subsetted_ds[science_var_name]
 
