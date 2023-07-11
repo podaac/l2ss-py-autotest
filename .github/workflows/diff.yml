@@ -15,12 +15,6 @@ jobs:
       new_uat_associations: ${{ steps.diff.outputs.new_uat_associations }}
       new_ops_associations: ${{ steps.diff.outputs.new_ops_associations }}
     steps:
-      - uses: getsentry/action-github-app-token@v2
-        name: Get GH App token
-        id: podaac-cicd
-        with:
-          app_id: ${{ secrets.CICD_APP_ID }}
-          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
@@ -49,6 +43,12 @@ jobs:
     runs-on: ubuntu-latest
     name: UAT ${{ matrix.concept_id }}
     steps:
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v3
       - name: Update uat_associations
         run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
@@ -83,6 +83,12 @@ jobs:
     runs-on: ubuntu-latest
     name: OPS ${{ matrix.concept_id }}
     steps:
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v3
       - name: Update ops_associations
         run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
