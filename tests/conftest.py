@@ -15,11 +15,11 @@ except KeyError:
 
 
 @pytest.hookimpl(trylast=True)
-def pytest_terminal_summary(session, _):
+def pytest_sessionfinish(session, exitstatus):
     # Use custom exit code when any test is skipped so CI is able to differentiate a partial pass
     reporter = session.config.pluginmanager.get_plugin('terminalreporter')
 
-    if 'skipped' in reporter.stats and reporter.stats['skipped'] > 0:
+    if 'skipped' in reporter.stats and len(reporter.stats['skipped']) > 0:
         session.exitstatus = 30
 
 
