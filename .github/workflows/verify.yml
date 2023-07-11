@@ -53,3 +53,8 @@ jobs:
           report_suite_logs: info
           check_name: Test Results for ${{ steps.get-env-ccid.outputs.concept_id }}
           files: test-results/test_report.xml
+      - name: Conclusion
+        run: |
+          echo "Passed is ${{ fromJSON( steps.test-results.outputs.json ).stats.tests_succ }}"
+          echo "Failed is ${{ fromJSON( steps.test-results.outputs.json ).stats.tests_fail }}"
+          echo "Skipped is ${{ fromJSON( steps.test-results.outputs.json ).stats.tests_skip }}"
