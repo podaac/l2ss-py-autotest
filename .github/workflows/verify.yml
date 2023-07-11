@@ -5,7 +5,9 @@ on: pull_request
 jobs:
   verify_collection:
     outputs:
-      test_results: ${{ steps.test-results.outputs.json }}
+      any_test_failed: ${{ steps.test-result.outputs.any_test_failed }}
+      any_test_skipped: ${{ steps.test-result.outputs.any_test_skipped }}
+      all_tests_passed: ${{ steps.test-result.outputs.all_tests_passed }}
     permissions:
       checks: write
       # only needed unless run with comment_mode: off
@@ -48,6 +50,13 @@ jobs:
           json_file: test-results/test_results.json
           comment_title: Test Results for ${{ steps.get-env-ccid.outputs.concept_id }}
           files: test-results/test_report.xml
+      - name: Save Test Outputs
+        id: test-result
+        if: always()
+        run: |
+          echo "any_test_failed=${{ fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_fail > 0 }}" >> $GITHUB_OUTPUT
+          echo "any_test_skipped=${{ fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_skip > 0 }}" >> $GITHUB_OUTPUT
+          echo "all_tests_passed=${{ fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.test_results ).stats.tests }}" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v2
         if: always()
         with:
@@ -73,7 +82,7 @@ jobs:
     needs: verify_collection
     name: Fail Pull Request
     runs-on: ubuntu-latest
-    if: fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_fail > 0
+    if: needs.verify_collection.outputs.any_test_failed
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
