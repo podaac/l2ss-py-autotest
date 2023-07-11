@@ -7,6 +7,7 @@ from typing import List, Dict
 
 import cf_xarray as cfxr
 import harmony
+import netCDF4
 import numpy as np
 import podaac.subsetter.subset
 import pytest
@@ -243,18 +244,34 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
         logging.warning("Unable to find lat/lon vars using cf_xarray")
 
     # If that still doesn't work, try using l2ss-py directly
-    lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(dataset)
-    if lat_var_names and lon_var_names:
-        lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
-        lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
+    try:
+        lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(dataset)
+        if lat_var_names and lon_var_names:
+            lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
+            lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
+            return lat_var_name, lon_var_name
+    except ValueError:
+        logging.warning("Unable to find lat/lon vars using l2ss-py")
+
+    # Still no dice, try using the 'units' variable attribute
+    for coord_name, coord in dataset.coords.items():
+        if 'units' not in coord.attrs:
+            continue
+        if coord.attrs['units'] == 'degrees_north' and lat_var_name is None:
+            lat_var_name = coord_name
+        if coord.attrs['units'] == 'degrees_east' and lon_var_name is None:
+            lon_var_name = coord_name
+    if lat_var_name and lon_var_name:
         return lat_var_name, lon_var_name
+    else:
+        logging.warning("Unable to find lat/lon vars using 'units' attribute")
 
     # Out of options, fail the test because we couldn't determine lat/lon variables
-    pytest.fail(f"Unable to find latitude and longitude variables. Tried UMM-V, cf_xarray, and l2ss-py.")
+    pytest.fail(f"Unable to find latitude and longitude variables.")
 
 
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token, request_session):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
@@ -267,7 +284,8 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     east = east - abs(.05 * (east - west))
 
     # Build harmony request
-    harmony_client = harmony.Client(env=harmony_env, auth=(os.environ['CMR_USER'], os.environ['CMR_PASS']))
+    harmony_client = harmony.Client(env=harmony_env, token=bearer_token, should_validate_auth=False)
+    harmony_client.session = request_session
     request_bbox = harmony.BBox(w=west, s=south, e=east, n=north)
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection, spatial=request_bbox,
@@ -286,6 +304,16 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     # Verify spatial subset worked
     subsetted_ds = xarray.open_dataset(subsetted_filepath)
+    group = None
+    # Try to read group in file
+    with netCDF4.Dataset(subsetted_filepath) as f:
+        for g in f.groups:
+            ds = xarray.open_dataset(subsetted_filepath, group=g)
+            if len(ds.variables):
+                group = g
+                subsetted_ds = ds
+            else:
+                ds.close()
 
     lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables)
     assert lat_var_name and lon_var_name
