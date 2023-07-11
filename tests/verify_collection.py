@@ -32,7 +32,7 @@ def harmony_env(env):
     if env == 'uat':
         return harmony.config.Environment.UAT
     else:
-        return harmony.config.Environment.OPS
+        return harmony.config.Environment.PROD
 
 
 @pytest.fixture(scope="session")

@@ -39,24 +39,26 @@ jobs:
         run: |
           poetry install
           poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
-      - uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: test-results
-          path: test-results/**
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
           report_suite_logs: info
           check_name: Tested with Harmony
+          json_file: test-results/test_results.json
           comment_title: Test Results for ${{ steps.get-env-ccid.outputs.concept_id }}
           files: test-results/test_report.xml
+      - uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: test-results
+          path: test-results/**
+
   tests_pass:
     needs: verify_collection
     name: Merge Pull Request
     runs-on: ubuntu-latest
-    if: ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.json ).stats.tests }}
+    if: fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.test_results ).stats.tests
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
@@ -71,7 +73,7 @@ jobs:
     needs: verify_collection
     name: Fail Pull Request
     runs-on: ubuntu-latest
-    if: ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_fail > 0 }}
+    if: fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_fail > 0
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
@@ -92,7 +94,7 @@ jobs:
     needs: verify_collection
     name: Update Pull Request
     runs-on: ubuntu-latest
-    if: ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_skip > 0 }}
+    if: fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_skip > 0
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
