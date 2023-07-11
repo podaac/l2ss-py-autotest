@@ -58,9 +58,8 @@ jobs:
         if: always()
         run: |
           echo "any_test_failed='${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_fail > 0 }}'" >> $GITHUB_OUTPUT
-#          echo "any_test_failed=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_fail > 0 }}" >> $GITHUB_OUTPUT
-#          echo "any_test_skipped=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_skip > 0 }}" >> $GITHUB_OUTPUT
-#          echo "all_tests_passed=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.test_results ).stats.tests }}" >> $GITHUB_OUTPUT
+          echo "any_test_skipped='${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_skip > 0 }}'" >> $GITHUB_OUTPUT
+          echo "all_tests_passed='${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.test_results ).stats.tests }}'" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v2
         if: always()
         with:
@@ -71,7 +70,7 @@ jobs:
     needs: verify_collection
     name: Merge Pull Request
     runs-on: ubuntu-latest
-    if: needs.verify_collection.outputs.all_tests_passed
+    if: fromJSON( needs.verify_collection.outputs.all_tests_passed )
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
@@ -86,7 +85,7 @@ jobs:
     needs: verify_collection
     name: Fail Pull Request
     runs-on: ubuntu-latest
-    if: needs.verify_collection.outputs.any_test_failed
+    if: fromJSON( needs.verify_collection.outputs.any_test_failed )
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
@@ -107,7 +106,7 @@ jobs:
     needs: verify_collection
     name: Update Pull Request
     runs-on: ubuntu-latest
-    if: needs.verify_collection.outputs.any_test_skipped
+    if: fromJSON( needs.verify_collection.outputs.any_test_skipped )
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
