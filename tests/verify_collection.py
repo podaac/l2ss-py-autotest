@@ -224,7 +224,7 @@ def get_lat_lon_var_names(dataset):
 def test_spatial_subset(collection_concept_id, env, granule_json, original_granule_localpath: pathlib.Path,
                         collection_variables,
                         harmony_env, tmp_path: pathlib.Path):
-    pytest.skip("to my loo")
+    pytest.fail("to my loo")
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
