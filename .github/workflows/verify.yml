@@ -73,7 +73,7 @@ jobs:
     needs: verify_collection
     name: Fail Pull Request
     runs-on: ubuntu-latest
-#    if: fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_fail > 0
+    if: fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_fail > 0
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
