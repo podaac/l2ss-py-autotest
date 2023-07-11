@@ -121,7 +121,7 @@ jobs:
         with:
           message: |
             **Action Needed**
-            Unable to verify collection because ${{ fromJSON( needs.verify_collection.outputs.json ).stats.tests_skip > 0 }} test(s) were skipped.
+            Unable to verify collection because test(s) were skipped.
             Open the status check to view the logs from the test run and determine why tests were skipped.
             If there is a justifiable reason, add a comment here and manually merge this PR to accept this unverified association.
             Otherwise, fix the problem that caused the test to be skipped and rerun verification.
