@@ -10,10 +10,6 @@ jobs:
       checks: write
       # only needed unless run with comment_mode: off
       pull-requests: write
-      # only needed for private repository
-      contents: read
-      # only needed for private repository
-      issues: read
     if: |
         ${{ startsWith(github.head_ref, 'diff/uat') }}      ||
         ${{ startsWith(github.head_ref, 'diff/ops') }}
@@ -87,6 +83,11 @@ jobs:
           labels: |
             failed verification
             bug
+      - uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            **Action Needed**
+            Tests have failed. Open the status checks to view the logs and review the failure.
   tests_skipped:
     needs: verify_collection
     name: Update Pull Request
