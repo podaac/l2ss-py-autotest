@@ -42,6 +42,7 @@ jobs:
           poetry install
           poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
       - name: Publish Test Results
+        id: publish-test
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
@@ -54,9 +55,9 @@ jobs:
         id: test-result
         if: always()
         run: |
-          echo "any_test_failed=${{ fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_fail > 0 }}" >> $GITHUB_OUTPUT
-          echo "any_test_skipped=${{ fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_skip > 0 }}" >> $GITHUB_OUTPUT
-          echo "all_tests_passed=${{ fromJSON( needs.verify_collection.outputs.test_results ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.test_results ).stats.tests }}" >> $GITHUB_OUTPUT
+          echo "any_test_failed=${{ fromJSON( steps.publish-test.outputs.test_results ).stats.tests_fail > 0 }}" >> $GITHUB_OUTPUT
+          echo "any_test_skipped=${{ fromJSON( steps.publish-test.outputs.test_results ).stats.tests_skip > 0 }}" >> $GITHUB_OUTPUT
+          echo "all_tests_passed=${{ fromJSON( steps.publish-test.outputs.test_results ).stats.tests_succ == fromJSON( needs.verify_collection.outputs.test_results ).stats.tests }}" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v2
         if: always()
         with:
