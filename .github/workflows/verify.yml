@@ -62,10 +62,10 @@ jobs:
           echo "any_test_skipped=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_skip > 0 }}" >> $GITHUB_OUTPUT
           echo "any_test_error=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_error > 0 }}" >> $GITHUB_OUTPUT
           echo "all_tests_passed=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_succ == fromJSON( steps.publish-test.outputs.json ).stats.tests }}" >> $GITHUB_OUTPUT
-          # echo "any_test_failed=false"  >> $GITHUB_OUTPUT
-          # echo "any_test_skipped=true" >> $GITHUB_OUTPUT
-          # echo "any_test_error=false"   >> $GITHUB_OUTPUT
-          # echo "all_test_passed=false"  >> $GITHUB_OUTPUT
+          echo "any_test_failed=false"  >> $GITHUB_OUTPUT
+          echo "any_test_skipped=true" >> $GITHUB_OUTPUT
+          echo "any_test_error=false"   >> $GITHUB_OUTPUT
+          echo "all_test_passed=false"  >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v2
         if: always()
         with:
