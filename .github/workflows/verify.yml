@@ -73,7 +73,7 @@ jobs:
           path: test-results/**
 
       - name: Attempt failure
-        if: ${{ env.any_test_failed }}
+        if: always()
         run: 
           exit 1
   
@@ -117,9 +117,6 @@ jobs:
           message: |
             **Action Needed**
             Tests have failed or encountered an unknown error. Open the status checks to view the logs and review the failure.
-
-      - name: Enable Pull Request Automerge
-        run: gh pr merge --merge --disable-auto
   tests_skipped:
     needs: verify_collection
     name: Update Pull Request
