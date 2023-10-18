@@ -110,6 +110,10 @@ jobs:
           message: |
             **Action Needed**
             Tests have failed or encountered an unknown error. Open the status checks to view the logs and review the failure.
+
+      - name: Enable Pull Request Automerge
+        run: gh pr merge --merge --disable-auto
+
       - name: Fail auto-merge
         run: exit 1
   tests_skipped:
