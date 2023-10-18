@@ -112,6 +112,14 @@ jobs:
             Tests have failed or encountered an unknown error. Open the status checks to view the logs and review the failure.
       - name: Fail auto-merge
         run: exit 1
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          report_suite_logs: info
+          check_name: Failed Tests Exist
+          comment_title: There are failed tests for ${{ steps.get-env-ccid.outputs.concept_id }}
   tests_skipped:
     needs: verify_collection
     name: Update Pull Request
