@@ -71,7 +71,7 @@ jobs:
         with:
           name: test-results
           path: test-results/**
-      - name: Check Status for Test Results 
+      - name: Failure to Complete All Tests
         uses: LouisBrunner/checks-action@v1.6.1
         if: steps.test-result.outputs.any_test_failed == 'true' || steps.test-result.outputs.any_test_skipped == 'true' || steps.test-result.outputs.any_test_error == 'true' || steps.test-result.outputs.all_test_passed == 'false'
         with:
@@ -80,6 +80,18 @@ jobs:
           conclusion: failure
           output: |
             {"summary":"One or more tests were failed, skipped, or had an error"}
+      - name: Succeeded in Completing All Tests
+        uses: LouisBrunner/checks-action@v1.6.1
+        if: steps.test-result.outputs.any_test_failed == 'false' && steps.test-result.outputs.any_test_skipped == 'false' && steps.test-result.outputs.any_test_error == 'false' && steps.test-result.outputs.all_test_passed == 'true'
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: All Tests Run And Passed
+          conclusion: success
+          output: |
+            {"summary":"No errors, skipped tests, or failed tests detected"}
+    
+
+
   tests_pass:
     needs: verify_collection
     name: Merge Pull Request
