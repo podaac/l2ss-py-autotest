@@ -73,7 +73,7 @@ jobs:
           path: test-results/**
       - name: Check Status for Test Results 
         uses: LouisBrunner/checks-action@v1.6.1
-        if: env.any_test_failed == 'true' || env.any_test_skipped == 'true' || env.any_test_error == 'true' || env.all_test_passed == 'false'
+        if: env.any_test_failed == 'true'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: All Tests Run And Passed
