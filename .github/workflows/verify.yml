@@ -72,6 +72,13 @@ jobs:
           name: test-results
           path: test-results/**
 
+      - name: Attempt failure
+        if: ${{ env.any_test_failed }}
+        run: 
+          exit 1
+  
+
+
   tests_pass:
     needs: verify_collection
     name: Merge Pull Request
@@ -113,9 +120,6 @@ jobs:
 
       - name: Enable Pull Request Automerge
         run: gh pr merge --merge --disable-auto
-
-      - name: Fail auto-merge
-        run: exit 1
   tests_skipped:
     needs: verify_collection
     name: Update Pull Request
@@ -139,6 +143,4 @@ jobs:
             Open the status check to view the logs from the test run and determine why tests were skipped.
             If there is a justifiable reason, add a comment here and manually merge this PR to accept this unverified association.
             Otherwise, fix the problem that caused the test to be skipped and rerun verification.
-      - name: Fail auto-merge
-        run: exit 1
     
