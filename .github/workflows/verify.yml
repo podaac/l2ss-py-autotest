@@ -77,7 +77,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: All Tests Run And Passed
-          conclusion: ${{ env.all_test_passed }}
+          conclusion: action_required
           output: |
             {"summary":"Testing a failed check"}
 
