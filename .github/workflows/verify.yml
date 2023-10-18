@@ -110,6 +110,8 @@ jobs:
           message: |
             **Action Needed**
             Tests have failed or encountered an unknown error. Open the status checks to view the logs and review the failure.
+      - name: Fail auto-merge
+        run: exit 1
   tests_skipped:
     needs: verify_collection
     name: Update Pull Request
@@ -133,3 +135,6 @@ jobs:
             Open the status check to view the logs from the test run and determine why tests were skipped.
             If there is a justifiable reason, add a comment here and manually merge this PR to accept this unverified association.
             Otherwise, fix the problem that caused the test to be skipped and rerun verification.
+      - name: Fail auto-merge
+        run: exit 1
+    
