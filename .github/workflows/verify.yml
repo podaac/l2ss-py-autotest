@@ -71,22 +71,15 @@ jobs:
         with:
           name: test-results
           path: test-results/**
-
-      - uses: LouisBrunner/checks-action@v1.6.1
-        if: always()
+      - name: Check Status for Test Results 
+        uses: LouisBrunner/checks-action@v1.6.1
+        if: env.any_test_failed == 'true' || env.any_test_skipped == 'true' || env.any_test_error == 'true' || env.all_test_passed == 'false'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: All Tests Run And Passed
           conclusion: failure
           output: |
-            {"summary":"Testing a failed check"}
-
-      - name: Attempt failure
-        run: 
-          exit 1
-  
-
-
+            {"summary":"One or more tests were failed, skipped, or had an error"}
   tests_pass:
     needs: verify_collection
     name: Merge Pull Request
