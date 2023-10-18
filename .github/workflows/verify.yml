@@ -73,7 +73,6 @@ jobs:
           path: test-results/**
 
       - name: Attempt failure
-        if: always()
         run: 
           exit 1
   
