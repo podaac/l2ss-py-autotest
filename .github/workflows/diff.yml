@@ -26,7 +26,8 @@ jobs:
       - name: Run diff
         id: diff
         env:
-          UAT_TOKEN_TEMP: ${{ secrets.UAT_TOKEN_TEMP }}
+          UAT_TOKEN_TEMP: ${{ secrets.LAUNCHPAD_TOKEN_UAT }}
+          OPS_TOKEN_TEMP: ${{ secrets.LAUNCHPAD_TOKEN_OPS }}
         run: |
           poetry install
 
