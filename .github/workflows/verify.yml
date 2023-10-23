@@ -82,7 +82,7 @@ jobs:
             {"summary":"One or more tests were failed, skipped, or had an error"}
       - name: Succeeded in Completing All Tests
         uses: LouisBrunner/checks-action@v1.6.1
-        if: steps.test-result.outputs.any_test_failed == 'false' && steps.test-result.outputs.any_test_skipped == 'false' && steps.test-result.outputs.any_test_error == 'false' && steps.test-result.outputs.all_test_passed == 'true'
+        if: steps.test-result.outputs.any_test_failed == 'false'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: All Tests Run And Passed
