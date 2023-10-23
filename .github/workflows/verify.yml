@@ -79,7 +79,7 @@ jobs:
 
       - name: Succeeded in Completing All Tests
         uses: LouisBrunner/checks-action@v1.6.1
-        if: steps.test-result.outputs.all_test_passed == 'true' 
+        if: env.all_tests_passed == 'true' 
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: All Tests Run And Passed
