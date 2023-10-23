@@ -31,20 +31,17 @@ jobs:
         run: |
           poetry install
 
+          echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+
           # new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)
           # new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)
-
-          echo "New UAT Associations: ${new_uat_associations}"
-          echo "New OPS Associations: ${new_ops_associations}"
-          
-          # echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
-          # echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
 
           # echo "new_uat_associations=[\"C1238687534-POCLOUD\"]" >> $GITHUB_OUTPUT
           # echo "new_ops_associations=[\"C1968979997-POCLOUD\"]" >> $GITHUB_OUTPUT
 
-          echo "new_uat_associations=[\"C1238687282-POCLOUD\"]" >> $GITHUB_OUTPUT
-          echo "new_ops_associations=[\"C1968979997-POCLOUD\"]" >> $GITHUB_OUTPUT
+          # echo "new_uat_associations=[\"C1238687282-POCLOUD\"]" >> $GITHUB_OUTPUT
+          # echo "new_ops_associations=[\"C1968979997-POCLOUD\"]" >> $GITHUB_OUTPUT
          
   open_pr_uat:
     needs: find_new

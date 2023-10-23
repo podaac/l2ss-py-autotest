@@ -134,7 +134,7 @@ jobs:
     needs: verify_collection
     name: Update Pull Request
     runs-on: ubuntu-latest
-    if: fromJSON( needs.verify_collection.outputs.any_test_skipped )
+    if: fromJSON( needs.verify_collection.outputs.any_test_skipped ) 
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
