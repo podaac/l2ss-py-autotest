@@ -72,11 +72,6 @@ jobs:
         with:
           name: test-results
           path: test-results/**
-
-      - name: Display outputs
-        run: |
-          echo "All Tests Passed: ${{ env.all_tests_passed }}"
-
       - name: Succeeded in Completing All Tests
         uses: LouisBrunner/checks-action@v1.6.1
         if: env.all_tests_passed == 'true' 
@@ -86,8 +81,6 @@ jobs:
           conclusion: success
           output: |
             {"summary":"No errors, skipped tests, or failed tests detected"}
-    
-
 
   tests_pass:
     needs: verify_collection

@@ -31,20 +31,13 @@ jobs:
         run: |
           poetry install
 
-          # echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
-          # echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
 
           # new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)
           # new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)
-
-          # echo "new_uat_associations=[\"C1238687534-POCLOUD\"]" >> $GITHUB_OUTPUT
-          # echo "new_ops_associations=[\"C1968979997-POCLOUD\"]" >> $GITHUB_OUTPUT
-
-          # echo "new_uat_associations=[\"C1238687282-POCLOUD\"]" >> $GITHUB_OUTPUT
-          # echo "new_ops_associations=[\"C1968979997-POCLOUD\"]" >> $GITHUB_OUTPUT
          
           #echo "new_uat_associations=[\"C1238658088-POCLOUD\",\"C1233154410-GES_DISC\",\"C1234666458-GES_DISC\",\"C1238621111-POCLOUD\",\"C1234666454-GES_DISC\",\"C1254989897-LARC_ASDC\",\"C1234666476-GES_DISC\",\"C1236469823-GES_DISC\",\"C1238621219-POCLOUD\",\"C1243175554-POCLOUD\"]" >> $GITHUB_OUTPUT
-          echo "new_uat_associations=[\"C1238621111-POCLOUD\",\"C1238658088-POCLOUD\"]" >> $GITHUB_OUTPUT
           #echo "new_ops_associations=[\"C1968979997-POCLOUD\"]" >> $GITHUB_OUTPUT
 
 
