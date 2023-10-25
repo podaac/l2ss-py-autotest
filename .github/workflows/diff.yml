@@ -31,6 +31,9 @@ jobs:
         run: |
           poetry install
 
+                    
+
+
           # echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
           # echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
 
@@ -59,7 +62,11 @@ jobs:
           private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v3
       - name: Update uat_associations
-        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
+        run: |
+          ASSOCIATIONS=$(cat $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt |grep -v #)
+          echo "$ASSOCIATIONS" > $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
+          echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
+          echo "# END OF FILE" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v5
@@ -99,7 +106,11 @@ jobs:
           private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v3
       - name: Update ops_associations
-        run: echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+        run: |
+          ASSOCIATIONS=$(cat $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt |grep -v #)
+          echo "$ASSOCIATIONS" > $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+          echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+          echo "# END OF FILE" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v5
