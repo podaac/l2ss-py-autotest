@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Update uat_associations
         run: |
-          ASSOCIATIONS=$(cat $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt |grep -v #)
+          ASSOCIATIONS=$( cat $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt |grep -v '#' )
           echo "$ASSOCIATIONS" > $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
           echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
           echo "# END OF FILE" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
@@ -107,7 +107,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Update ops_associations
         run: |
-          ASSOCIATIONS=$(cat $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt |grep -v #)
+          ASSOCIATIONS=$( cat $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt |grep -v '#' )
           echo "$ASSOCIATIONS" > $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
           echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
           echo "# END OF FILE" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
