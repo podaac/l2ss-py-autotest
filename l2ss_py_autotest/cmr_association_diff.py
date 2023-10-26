@@ -16,6 +16,7 @@ python cmr_association_diff.py -c TL1240538128-POCLOUD -e uat -t tool -a hitide_
 import json
 import argparse
 import cmr
+import os.path
 
 
 def pull_concept_id(cmr_env, provider, umm_name, umm_type):
@@ -138,7 +139,8 @@ def parse_args():
 
     parser.add_argument('-a', '--assoc',
                         help='Association concept ID or file containing'
-                             ' many concept IDs to be associated'
+                             ' many concept IDs to be associated or dir'
+                             ' containing filenames matching concept IDs'
                              ' with UMM provided.',
                         required=True,
                         default=None,
@@ -193,8 +195,11 @@ def run():
         if not result:
             raise Exception(f"Could not retrieve umm {umm_type} using concept_id {concept_id}")
 
-    with open(association_file) as file:  # pylint: disable=W1514
-        collections = [x.strip() for x in file.readlines()]
+    if os.path.isdir(association_file):
+        collections = [os.listdir(association_file)]
+    else:
+        with open(association_file) as file:  # pylint: disable=W1514
+            collections = [x.strip() for x in file.readlines()]
 
     current_concept_ids = current_association(concept_id, cmr_env, umm_type, current_token)
 
