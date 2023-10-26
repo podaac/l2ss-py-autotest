@@ -27,10 +27,6 @@ def pytest_generate_tests(metafunc):
     if metafunc.config.option.regression:
         cmr_dirpath = pathlib.Path('cmr')
 
-        # association_file = 'uat_associations.txt' if metafunc.config.option.env == 'uat' else 'ops_associations.txt'
-        # with open(cmr_dirpath.joinpath(association_file)) as file:
-        #     associations = [line.rstrip() for line in file]
-
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = [os.listdir(cmr_dirpath.joinpath(association_dir))]
 
