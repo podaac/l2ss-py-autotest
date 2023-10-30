@@ -31,19 +31,12 @@ jobs:
         run: |
           poetry install
 
-                    
+          echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
 
-
-          # echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
-          # echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
-
-          # new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)
-          # new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)
-         
-          echo "new_uat_associations=[\"C1238658088-POCLOUD\",\"C1233154410-GES_DISC\",\"C1234666458-GES_DISC\",\"C1238621111-POCLOUD\",\"C1234666454-GES_DISC\",\"C1254989897-LARC_ASDC\",\"C1234666476-GES_DISC\",\"C1236469823-GES_DISC\",\"C1238621219-POCLOUD\",\"C1243175554-POCLOUD\"]" >> $GITHUB_OUTPUT
+          #echo "new_uat_associations=[\"C1238658088-POCLOUD\",\"C1233154410-GES_DISC\",\"C1234666458-GES_DISC\",\"C1238621111-POCLOUD\",\"C1234666454-GES_DISC\",\"C1254989897-LARC_ASDC\",\"C1234666476-GES_DISC\",\"C1236469823-GES_DISC\",\"C1238621219-POCLOUD\",\"C1243175554-POCLOUD\"]" >> $GITHUB_OUTPUT
+          #echo "new_uat_associations=[\"C1238658088-POCLOUD\",\"C1233154410-GES_DISC\"]" >> $GITHUB_OUTPUT
           #echo "new_ops_associations=[\"C1968979997-POCLOUD\"]" >> $GITHUB_OUTPUT
-
-
   open_pr_uat:
     needs: find_new
     strategy:
@@ -63,7 +56,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: Update uat_associations
         run: |
-          echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
+          mkdir -p $GITHUB_WORKSPACE/tests/cmr/uat
+          echo "${{ matrix.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/uat/${{ matrix.concept_id }}
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v5
@@ -104,7 +98,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: Update ops_associations
         run: |
-          echo "${{ matrix.concept_id }}" >> $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+          mkdir -p $GITHUB_WORKSPACE/tests/cmr/ops
+          echo "${{ matrix.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/ops/${{ matrix.concept_id }}
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v5
