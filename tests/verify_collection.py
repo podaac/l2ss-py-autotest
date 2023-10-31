@@ -11,6 +11,7 @@ import netCDF4
 import numpy as np
 import podaac.subsetter.subset
 import pytest
+import pdb
 import requests
 import xarray
 from requests.auth import HTTPBasicAuth
@@ -238,12 +239,13 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
     logging.warning("Unable to find lat/lon vars in UMM-Var")
 
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
-    try:
-        return dataset.cf.coordinates['latitude'][0], dataset.cf.coordinates['longitude'][0]
-    except:
-        logging.warning("Unable to find lat/lon vars using cf_xarray")
+    #try:
+    #    return dataset.cf.coordinates['latitude'][0], dataset.cf.coordinates['longitude'][0]
+    #except:
+    #    logging.warning("Unable to find lat/lon vars using cf_xarray")
 
     # If that still doesn't work, try using l2ss-py directly
+    #pdb.set_trace()
     try:
         lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(dataset)
         if lat_var_names and lon_var_names:
@@ -267,8 +269,8 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
         logging.warning("Unable to find lat/lon vars using 'units' attribute")
 
     # Out of options, fail the test because we couldn't determine lat/lon variables
-    pytest.fail(f"Unable to find latitude and longitude variables.")
-
+    logging.warning(f"Unable to find latitude and longitude variables in this group.")
+    return None, None
 
 @pytest.mark.timeout(300)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
@@ -308,15 +310,26 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     group = None
     # Try to read group in file
     with netCDF4.Dataset(subsetted_filepath) as f:
-        for g in f.groups:
-            ds = xarray.open_dataset(subsetted_filepath, group=g)
-            if len(ds.variables):
-                group = g
-                subsetted_ds = ds
-            else:
-                ds.close()
+        ds = xarray.open_dataset(subsetted_filepath, group='')
+        lat_var_name = None
+        if len(ds.variables):
+            subsetted_ds = ds
+            lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables)
+        if lat_var_name:
+            ds.close()
+            pass
+        else:
+            for g in f.groups:
+                ds = xarray.open_dataset(subsetted_filepath, group=g)
+                #pdb.set_trace()
+                if len(ds.variables):
+                    group = g
+                    subsetted_ds = ds
+                    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables)
 
-    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables)
+                else:
+                    ds.close()
+
     assert lat_var_name and lon_var_name
 
     if science_vars := get_science_vars(collection_variables):
