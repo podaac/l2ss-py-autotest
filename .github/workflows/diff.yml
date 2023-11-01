@@ -34,6 +34,9 @@ jobs:
           ls $GITHUB_WORKSPACE/tests/cmr/uat/ > $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
           ls $GITHUB_WORKSPACE/tests/cmr/ops/ > $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
 
+          cat $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
+          cat $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+
           echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
           echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
 
