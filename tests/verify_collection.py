@@ -257,7 +257,6 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
         logging.warning("Unable to find lat/lon vars using cf_xarray")
 
     # If that still doesn't work, try using l2ss-py directly
-    #pdb.set_trace()
     try:
         lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(dataset)
         if lat_var_names and lon_var_names:
