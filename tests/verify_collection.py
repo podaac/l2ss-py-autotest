@@ -239,10 +239,22 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
     logging.warning("Unable to find lat/lon vars in UMM-Var")
 
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
-    #try:
-    #    return dataset.cf.coordinates['latitude'][0], dataset.cf.coordinates['longitude'][0]
-    #except:
-    #    logging.warning("Unable to find lat/lon vars using cf_xarray")
+    try:
+        for lat in dataset.cf.coordinates['latitude']:
+            if lat in ['lat', 'latitude']:
+                lat_coord = lat
+                break
+            
+        for lon in dataset.cf.coordinates['longitude']:
+            if lon in ['lon', 'longitude']:
+                lon_coord = lon
+                break
+        if lat_coord and lon_coord:
+            return lat_coord, lon_coord
+        else:
+            raise Exception
+    except:
+        logging.warning("Unable to find lat/lon vars using cf_xarray")
 
     # If that still doesn't work, try using l2ss-py directly
     #pdb.set_trace()
@@ -321,7 +333,6 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         else:
             for g in f.groups:
                 ds = xarray.open_dataset(subsetted_filepath, group=g)
-                #pdb.set_trace()
                 if len(ds.variables):
                     group = g
                     subsetted_ds = ds
