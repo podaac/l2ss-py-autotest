@@ -4,8 +4,8 @@
 name: Scan For New Associations
 on:
   workflow_dispatch:
-#  schedule:
-#    - cron: '*/5 * * * *'
+  schedule:
+    - cron: '0 1 * * *'
 
 jobs:
   find_new:
