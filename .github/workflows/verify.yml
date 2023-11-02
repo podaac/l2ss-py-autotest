@@ -17,7 +17,8 @@ jobs:
       pull-requests: write
     if: |
         ${{ startsWith(github.head_ref, 'diff/uat') }}      ||
-        ${{ startsWith(github.head_ref, 'diff/ops') }}
+        ${{ startsWith(github.head_ref, 'diff/ops') }}      ||
+        contains(github.event.issue.labels.*.name, 'autotest')
     name: Verify ${{ github.event.pull_request.title }}
     runs-on: ubuntu-latest
     steps:
