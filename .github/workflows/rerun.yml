@@ -17,6 +17,6 @@ jobs:
         run: |
           echo "${{ steps.list.outputs.pulls }}" > pr.list
           sed -i -E 's/\\n/\n/g' pr.list
-          cat pr.list |grep http > pr.list
-          cat pr.list
+          cat pr.list |grep http > pr2.list
+          cat pr2.list
           #gh pr checks --rerun
