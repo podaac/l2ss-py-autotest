@@ -13,6 +13,8 @@ jobs:
         with:
           token: ${{secrets.GITHUB_TOKEN}}
           labels: '["autotest"]'
+
+      - uses: actions/checkout@v3
       - name: output
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
