@@ -17,4 +17,5 @@ jobs:
         run: |
           echo "${{ steps.list.outputs.pulls }}" > pr.list
           sed -i -E 's/\\n/\n/g' pr.list
+          cat pr.list
           #gh pr checks --rerun
