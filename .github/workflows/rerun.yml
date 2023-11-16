@@ -5,7 +5,7 @@ on:
 jobs:
   send_pull_requests:
     runs-on: ubuntu-latest
-    name: A job to say hello
+    name: Re-Execute any Autotest PR checks
     steps:
       - name: listPullRequests
         uses: buildsville/list-pull-requests@v1
