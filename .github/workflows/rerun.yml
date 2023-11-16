@@ -1,0 +1,17 @@
+name: remind review
+on:
+    workflow_dispatch:
+
+jobs:
+  send_pull_requests:
+    runs-on: ubuntu-latest
+    name: A job to say hello
+    steps:
+      - name: listPullRequests
+        uses: buildsville/list-pull-requests@v1
+        id: list
+        with:
+          token: ${{secrets.GITHUB_TOKEN}}
+          labels: '["Autotest"]'
+      - name: output
+        run: echo '${{ steps.list.outputs.pulls }}'
