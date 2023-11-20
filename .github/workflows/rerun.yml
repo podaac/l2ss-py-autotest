@@ -1,0 +1,28 @@
+name: Re-Run Unverified PRs
+on:
+    workflow_dispatch:
+
+jobs:
+  send_pull_requests:
+    runs-on: ubuntu-latest
+    name: Re-Execute any Autotest PR checks
+    steps:
+      - name: listPullRequests
+        uses: buildsville/list-pull-requests@v1
+        id: list
+        with:
+          token: ${{secrets.GITHUB_TOKEN}}
+          labels: '["autotest"]'
+
+      - uses: actions/checkout@v3
+      - name: output
+        env:
+          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: |
+          echo "${{ steps.list.outputs.pulls }}" > pr.list
+          sed -i -E 's/\\n/\n/g' pr.list
+          cat pr.list |grep http > pr2.list
+          while read pr; do
+            gh label create autotest-recheck -f
+            gh pr edit $pr --add-label autotest-recheck
+          done <pr2.list

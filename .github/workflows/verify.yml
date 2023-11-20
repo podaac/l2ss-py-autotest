@@ -2,6 +2,7 @@
 name: Verify New Associations
 on:
   pull_request:
+    types: [ synchronize ]
 
 
 jobs:
@@ -17,7 +18,8 @@ jobs:
       pull-requests: write
     if: |
         ${{ startsWith(github.head_ref, 'diff/uat') }}      ||
-        ${{ startsWith(github.head_ref, 'diff/ops') }}
+        ${{ startsWith(github.head_ref, 'diff/ops') }}      ||
+        contains(github.event.issue.labels.*.name, 'autotest')
     name: Verify ${{ github.event.pull_request.title }}
     runs-on: ubuntu-latest
     steps:
@@ -67,7 +69,7 @@ jobs:
           # echo "any_test_skipped=false" >> $GITHUB_OUTPUT
           # echo "any_test_error=false"   >> $GITHUB_OUTPUT
           # echo "all_test_passed=true"  >> $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: test-results
