@@ -7,13 +7,18 @@ jobs:
     runs-on: ubuntu-latest
     name: Re-Execute any Autotest PR checks
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with: 
+          token: ${{secrets.GITHUB_TOKEN}}
+
 
       - name: Empty Commits
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: |
+          cd ${{ GITHUB_WORKSPACE }}
           git branch -r >branches.list
+          cat branches.list
           cat branches.list|grep \/diff\/ |sed 's/^origin\///g' >branches2.list
           cat branches2.list                
   
