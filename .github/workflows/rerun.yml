@@ -19,7 +19,7 @@ jobs:
           cd $GITHUB_WORKSPACE
           git fetch --all
           git branch -r >branches.list
-          cat branches.list
-          cat branches.list|grep \/diff\/ |sed 's/^origin\///g' >branches2.list
+          #cat branches.list
+          cat branches.list|grep \/diff\/ |sed 's|^origin/||g' >branches2.list
           cat branches2.list                
   
