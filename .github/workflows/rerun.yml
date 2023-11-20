@@ -26,6 +26,6 @@ jobs:
             echo "Branch: $branch"
             git checkout $branch
             git commit --allow-empty -m "Triggering Autotest Workflow Re-Run"
-            git push $branch
+            git push origin $branch
             exit
           done <branches2.list  
