@@ -14,7 +14,7 @@ jobs:
 
       - name: Empty Commits
         env:
-          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: |
           cd $GITHUB_WORKSPACE
           git fetch --all
