@@ -1,17 +1,19 @@
-name: remind review
+name: Re-Run Unverified PRs
 on:
     workflow_dispatch:
 
 jobs:
   send_pull_requests:
     runs-on: ubuntu-latest
-    name: A job to say hello
+    name: Re-Execute any Autotest PR checks
     steps:
-      - name: listPullRequests
-        uses: buildsville/list-pull-requests@v1
-        id: list
-        with:
-          token: ${{secrets.GITHUB_TOKEN}}
-          labels: '["Autotest"]'
-      - name: output
-        run: echo '${{ steps.list.outputs.pulls }}'
+      - uses: actions/checkout@v3
+
+      - name: Empty Commits
+        env:
+          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: |
+          git branch -r >branches.list
+          cat branches.list|grep \/diff\/ |sed 's/^origin\///g' >branches2.list
+          cat branches2.list                
+  
