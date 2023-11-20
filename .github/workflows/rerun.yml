@@ -22,6 +22,10 @@ jobs:
           #cat branches.list
           cat branches.list|grep \/diff\/ |sed 's|origin/||g' >branches2.list
           cat branches2.list                
+
+          git config --global user.email ${{ github.actor }}@users.noreply.github.com
+          git config --global user.name "${{ github.actor }}"
+
           while read branch; do
             echo "Branch: $branch"
             git checkout $branch
