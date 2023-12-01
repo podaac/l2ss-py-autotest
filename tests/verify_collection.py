@@ -20,6 +20,8 @@ import cmr
 
 assert cfxr, "cf_xarray adds extensions to xarray on import"
 
+VALID_LATITUDE_VARIABLE_NAMES = ['lat', 'latitude']
+VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
 
 @pytest.fixture(scope="session")
 def env(pytestconfig):
@@ -227,7 +229,7 @@ def get_variable_name_from_umm_json(variable_umm_json) -> str:
     return ""
 
 
-def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: List[Dict]):
+def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: List[Dict], group: str):
     # Try getting it from UMM-Var first
     lat_var_json, lon_var_json, _ = get_coordinate_vars_from_umm(collection_variable_list)
     lat_var_name = get_variable_name_from_umm_json(lat_var_json)
@@ -241,12 +243,12 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
     try:
         for lat in dataset.cf.coordinates['latitude']:
-            if lat in ['lat', 'latitude']:
+            if lat in VALID_LATITUDE_VARIABLE_NAMES:
                 lat_coord = lat
                 break
             
         for lon in dataset.cf.coordinates['longitude']:
-            if lon in ['lon', 'longitude']:
+            if lon in VALID_LONGITUDE_VARIABLE_NAMES:
                 lon_coord = lon
                 break
         if lat_coord and lon_coord:
@@ -280,7 +282,7 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
         logging.warning("Unable to find lat/lon vars using 'units' attribute")
 
     # Out of options, fail the test because we couldn't determine lat/lon variables
-    logging.warning(f"Unable to find latitude and longitude variables in this group.")
+    logging.warning(f"Unable to find latitude and longitude variables in this group: %s", group)
     return None, None
 
 @pytest.mark.timeout(300)
@@ -325,7 +327,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         lat_var_name = None
         if len(ds.variables):
             subsetted_ds = ds
-            lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables)
+            lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables, '')
         if lat_var_name:
             ds.close()
             pass
@@ -335,7 +337,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
                 if len(ds.variables):
                     group = g
                     subsetted_ds = ds
-                    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables)
+                    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables, group)
 
                 else:
                     ds.close()
