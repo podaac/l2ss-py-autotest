@@ -16,5 +16,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: |
-          cd $GITHUB_WORKSPACE
+          ls -al
+          pwd
+          #cd $GITHUB_WORKSPACE
           sh rerun_checks.sh unverified
