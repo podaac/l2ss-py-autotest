@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     if: fromJSON( needs.verify_collection.outputs.all_tests_passed )
     steps:
-      - uses: actions-ecosystem/action-remove-labels@v2
+      - uses: actions-ecosystem/action-remove-labels@v1
         with:
           labels: |
             unverified
@@ -107,7 +107,7 @@ jobs:
       fromJSON( needs.verify_collection.outputs.any_test_failed ) ||
       fromJSON( needs.verify_collection.outputs.any_test_error )
     steps:
-      - uses: actions-ecosystem/action-remove-labels@v2
+      - uses: actions-ecosystem/action-remove-labels@v1
         with:
           labels: |
             unverified
@@ -128,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     if: fromJSON( needs.verify_collection.outputs.any_test_skipped ) 
     steps:
-      - uses: actions-ecosystem/action-remove-labels@v2
+      - uses: actions-ecosystem/action-remove-labels@v1
         with:
           labels: |
             unverified
