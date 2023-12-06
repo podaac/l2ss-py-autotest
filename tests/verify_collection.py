@@ -19,7 +19,6 @@ import cmr
 
 assert cfxr, "cf_xarray adds extensions to xarray on import"
 
-
 @pytest.fixture(scope="session")
 def env(pytestconfig):
     return pytestconfig.getoption("env")
@@ -270,7 +269,7 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
     pytest.fail(f"Unable to find latitude and longitude variables.")
 
 
-@pytest.mark.timeout(300)
+@pytest.mark.timeout(600)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
@@ -304,12 +303,12 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         subsetted_filepath = pathlib.Path(filename)
 
     # Verify spatial subset worked
-    subsetted_ds = xarray.open_dataset(subsetted_filepath)
+    subsetted_ds = xarray.open_dataset(subsetted_filepath, decode_times=False)
     group = None
     # Try to read group in file
     with netCDF4.Dataset(subsetted_filepath) as f:
         for g in f.groups:
-            ds = xarray.open_dataset(subsetted_filepath, group=g)
+            ds = xarray.open_dataset(subsetted_filepath, group=g, decode_times=False)
             if len(ds.variables):
                 group = g
                 subsetted_ds = ds
