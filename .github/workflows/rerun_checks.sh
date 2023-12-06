@@ -10,8 +10,8 @@ cat branches.list|grep diff\/ |sed 's|^.*diff/|diff/|g' |sed 's|\t.*||g' >branch
 #cat branches.list|grep \/diff\/ |sed 's|^.*(diff/.*?)\s/.*$|$1|g' >branches2.list
 cat branches2.list                
 
-git config --global user.email ${{ github.actor }}@users.noreply.github.com
-git config --global user.name "${{ github.actor }}"
+#git config --global user.email ${{ github.actor }}@users.noreply.github.com
+#git config --global user.name "${{ github.actor }}"
 
 while read branch; do
   echo "Branch: $branch"
