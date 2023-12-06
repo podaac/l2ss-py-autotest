@@ -17,4 +17,4 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: |
           cd $GITHUB_WORKSPACE
-          sh rerun_checks.sh autotest
+          sh rerun_checks.sh unverified
