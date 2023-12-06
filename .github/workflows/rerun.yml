@@ -7,14 +7,18 @@ jobs:
     runs-on: ubuntu-latest
     name: Re-Execute any Autotest PR checks
     steps:
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v4
         with: 
-          token: ${{secrets.GITHUB_TOKEN}}
-
-
+          token: ${{ steps.podaac-cicd.outputs.token }}
       - name: Empty Commits
         env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GITHUB_TOKE: ${{ steps.podaac-cicd.outputs.token }}
         run: |
           cd .github/workflows
           git config --global user.email ${{ github.actor }}@users.noreply.github.com
