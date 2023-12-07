@@ -136,7 +136,7 @@ jobs:
         uses: actions-ecosystem/action-add-labels@v1
         with:
           labels: |
-            testsskipped
+            tests skipped
       - uses: mshick/add-pr-comment@v2
         with:
           message: |
