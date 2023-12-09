@@ -104,6 +104,12 @@ jobs:
     runs-on: ubuntu-latest
     name: OPS ${{ matrix.concept_id }}
     steps:
+      - name: Get collection ShortName for readability
+        run: |
+          cd $GITHUB_WORKSPACE
+          curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000" >cmr_metadata.json
+          SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "${{ matrix.concept_id }}")' |jq -r '.umm.ShortName')
+          echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
       - uses: getsentry/action-github-app-token@v2
         name: Get GH App token
         id: podaac-cicd
