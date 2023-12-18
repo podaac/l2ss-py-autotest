@@ -83,7 +83,7 @@ jobs:
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           branch: diff/uat/${{ matrix.concept_id }}
           delete-branch: true
-          title: UAT ${{ matrix.concept_id }} ${{ env.SHORT_NAME }}
+          title: UAT ${{ matrix.concept_id }} (${{ env.SHORT_NAME }})
           body: |
             New association between l2ss-py and ${{ matrix.concept_id }} found in UAT.
             Beginning verification of collection.
@@ -131,7 +131,7 @@ jobs:
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           branch: diff/ops/${{ matrix.concept_id }}
           delete-branch: true
-          title: OPS ${{ matrix.concept_id }} ${{ env.SHORT_NAME }}
+          title: OPS ${{ matrix.concept_id }} (${{ env.SHORT_NAME }})
           body: |
             New association between l2ss-py and ${{ matrix.concept_id }} found in OPS.
             Beginning verification of collection.
