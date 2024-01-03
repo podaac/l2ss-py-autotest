@@ -159,15 +159,7 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
 def get_bounding_box(granule_umm_json):
     # Find Bounding box for granule
     try:
-        bounding_box = granule_umm_json['umm']['SpatialExtent']['HorizontalSpatialDomain']['Geometry'][
-            'BoundingRectangles'][0]
 
-        north = bounding_box.get('NorthBoundingCoordinate')
-        south = bounding_box.get('SouthBoundingCoordinate')
-        west = bounding_box.get('WestBoundingCoordinate')
-        east = bounding_box.get('EastBoundingCoordinate')
-
-    except KeyError:
         longitude_list = []
         latitude_list = []
         polygons = granule_umm_json['umm']['SpatialExtent']['HorizontalSpatialDomain']['Geometry'].get(
@@ -189,6 +181,16 @@ def get_bounding_box(granule_umm_json):
         south = min(latitude_list)
         west = min(longitude_list)
         east = max(longitude_list)
+
+    except KeyError:
+
+        bounding_box = granule_umm_json['umm']['SpatialExtent']['HorizontalSpatialDomain']['Geometry'][
+            'BoundingRectangles'][0]
+
+        north = bounding_box.get('NorthBoundingCoordinate')
+        south = bounding_box.get('SouthBoundingCoordinate')
+        west = bounding_box.get('WestBoundingCoordinate')
+        east = bounding_box.get('EastBoundingCoordinate')
 
     return north, south, east, west
 
@@ -223,6 +225,38 @@ def get_variable_name_from_umm_json(variable_umm_json) -> str:
         return "/".join(name.strip("/").split('/')[1:]) if '/' in name else name
 
     return ""
+
+
+def create_smaller_bounding_box(east, west, north, south, scale_factor):
+    """
+    Create a smaller bounding box from the given east, west, north, and south values.
+
+    Parameters:
+    - east (float): Easternmost longitude.
+    - west (float): Westernmost longitude.
+    - north (float): Northernmost latitude.
+    - south (float): Southernmost latitude.
+    - scale_factor (float): Scale factor to determine the size of the smaller bounding box.
+
+    Returns:
+    - smaller_bounding_box (tuple): (east, west, north, south) of the smaller bounding box.
+    """
+
+    # Validate input
+    if east <= west or north <= south:
+        raise ValueError("Invalid input values for longitude or latitude.")
+
+    # Calculate the center of the original bounding box
+    center_lon = (east + west) / 2
+    center_lat = (north + south) / 2
+
+    # Calculate the new coordinates for the smaller bounding box
+    smaller_east = (east - center_lon) * scale_factor + center_lon
+    smaller_west = (west - center_lon) * scale_factor + center_lon
+    smaller_north = (north - center_lat) * scale_factor + center_lat
+    smaller_south = (south - center_lat) * scale_factor + center_lat
+
+    return smaller_east, smaller_west, smaller_north, smaller_south
 
 
 def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: List[Dict]):
@@ -278,10 +312,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     # Compute a box that is smaller than the granule extent bounding box
     north, south, east, west = get_bounding_box(granule_json)
-    north = north - abs(.05 * (north - south))
-    south = south + abs(.05 * (north - south))
-    west = west + abs(.05 * (east - west))
-    east = east - abs(.05 * (east - west))
+    east, west, north, south = create_smaller_bounding_box(east, west, north, south, .95)
 
     # Build harmony request
     harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
@@ -319,11 +350,12 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     assert lat_var_name and lon_var_name
 
     if science_vars := get_science_vars(collection_variables):
-        science_var_name = science_vars[0]['umm']['Name']
+        for idx, value in enumerate(science_vars):
+            science_var_name = science_vars[0]['umm']['Name']
     else:
         # Can't find a science var in UMM-V, just pick one
         science_var_name = next(iter([v for v in subsetted_ds.data_vars if
-                                      str(v) not in lat_var_name and str(v) not in lon_var_name]))
+                                      str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
     var_ds = subsetted_ds[science_var_name]
 
