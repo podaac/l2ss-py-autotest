@@ -33,9 +33,8 @@ jobs:
           while read prname; do
             echo "$prname" 
             COLLECTION_ID=$(echo $prname |sed -E 's/diff\/[uatops]+\///')
-            COMMAND="cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")' |jq -r '.umm.ShortName"
-            echo "COMMAND: $COMMAND"
-            SHORT_NAME=$($COMMAND)
+            echo "Searching for shortname for collection $COLLECTION_ID"
+            SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "${COLLECTION_ID}")' |jq -r '.umm.ShortName')
             echo "SHORT_NAME=$SHORT_NAME" 
           done <branches2.list
 
