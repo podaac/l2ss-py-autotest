@@ -1,0 +1,29 @@
+name: Update Shortnames for all PRs
+on:
+    workflow_dispatch:
+#    schedule: 
+#      - cron:  '00 5 * * *'
+
+jobs:
+  update_shortnames:
+    runs-on: ubuntu-latest
+    name: Update shortnames for PRs without shortnames
+    steps:
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+        with: 
+          token: ${{ steps.podaac-cicd.outputs.token }}
+      - name: listPullRequests
+        uses: buildsville/list-pull-requests@v1
+        id: list
+        with:
+          token: ${{ steps.podaac-cicd.outputs.token }}
+          labels: '["WFR"]'
+          skip_hour: '24'
+      - name: output
+        run: echo '${{ steps.list.outputs.pulls }}'
