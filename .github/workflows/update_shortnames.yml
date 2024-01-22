@@ -33,10 +33,9 @@ jobs:
 
           while read prname; do
             echo "$prname"
+          done <branches2.list
 
 #          COLLECTION_ID=$(echo ${{ github.event.pull_request.title }} |sed -E 's/[A-Z+] //' |sed -E 's/ \(.*//' )
 #          cd $GITHUB_WORKSPACE
 #          SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")' |jq -r '.umm.ShortName')
 #          echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
-
-          done <branches2.list
