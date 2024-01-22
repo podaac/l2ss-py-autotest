@@ -20,6 +20,6 @@ jobs:
           token: ${{ steps.podaac-cicd.outputs.token }}
       - name: retrieve list of open PRs
         run: |
-          gh pr list --state open --label $1 --limit 500 >branches.list
+          gh pr list --state open --label autotest --limit 500 >branches.list
           cat branches.list|grep diff\/ |sed 's|^.*diff/|diff/|g' |sed 's|\t.*||g' >branches2.list
           cat branches2.list
