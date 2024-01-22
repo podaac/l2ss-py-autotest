@@ -36,6 +36,15 @@ jobs:
         run: |
           echo "test_env=$(python -c "print('${{ github.head_ref }}'.split('/')[1])")" >> $GITHUB_OUTPUT
           echo "concept_id=$(python -c "print('${{ github.head_ref }}'.split('/')[2])")" >> $GITHUB_OUTPUT
+      - name: Get collection ShortName for readability
+        run: |
+          echo The Title of your PR is ${{ github.event.pull_request.title }}
+          cd $GITHUB_WORKSPACE
+          curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
+          SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "${{ matrix.concept_id }}")' |jq -r '.umm.ShortName')
+          rm cmr_metadata.json
+          echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
+          
       - name: Execute tests
         id: run-tests
         env:
