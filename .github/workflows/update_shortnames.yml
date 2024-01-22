@@ -18,12 +18,8 @@ jobs:
       - uses: actions/checkout@v4
         with: 
           token: ${{ steps.podaac-cicd.outputs.token }}
-      - name: listPullRequests
-        uses: buildsville/list-pull-requests@v1
-        id: list
-        with:
-          token: ${{ steps.podaac-cicd.outputs.token }}
-          labels: '["WFR"]'
-          skip_hour: '24'
-      - name: output
-        run: echo '${{ steps.list.outputs.pulls }}'
+      - name: retrieve list of open PRs
+        run: |
+          gh pr list --state open --label $1 --limit 500 >branches.list
+          cat branches.list|grep diff\/ |sed 's|^.*diff/|diff/|g' |sed 's|\t.*||g' >branches2.list
+          cat branches2.list
