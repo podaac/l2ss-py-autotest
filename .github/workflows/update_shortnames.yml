@@ -19,6 +19,8 @@ jobs:
         with: 
           token: ${{ steps.podaac-cicd.outputs.token }}
       - name: retrieve list of open PRs
+        env:
+          GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
         run: |
           gh pr list --state open --label autotest --limit 500 >branches.list
           cat branches.list|grep diff\/ |sed 's|^.*diff/|diff/|g' |sed 's|\t.*||g' >branches2.list
