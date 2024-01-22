@@ -18,10 +18,25 @@ jobs:
       - uses: actions/checkout@v4
         with: 
           token: ${{ steps.podaac-cicd.outputs.token }}
+      - name: Retrieve UAT and OPS metadata
+        run: |
+          curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
+  
+
+
       - name: retrieve list of open PRs
         env:
           GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
         run: |
           gh pr list --state open --label autotest --limit 500 >branches.list
           cat branches.list|grep diff\/ |sed 's|^.*diff/|diff/|g' |sed 's|\t.*||g' >branches2.list
-          cat branches2.list
+
+          while read prname; do
+            echo "$prname"
+
+#          COLLECTION_ID=$(echo ${{ github.event.pull_request.title }} |sed -E 's/[A-Z+] //' |sed -E 's/ \(.*//' )
+#          cd $GITHUB_WORKSPACE
+#          SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")' |jq -r '.umm.ShortName')
+#          echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
+
+          done <branches2.list
