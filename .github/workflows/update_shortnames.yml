@@ -46,6 +46,7 @@ jobs:
             if [[ $prname == *"/ops/"* ]]; then
               echo "Retrieving shortname from ops metadata"
               SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "${COLLECTION_ID}")' |jq -r '.umm.ShortName')
+              echo cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "${COLLECTION_ID}")' |jq -r '.umm.ShortName'
               echo "Found short name $SHORT_NAME"
             fi
             echo "SHORT_NAME=$SHORT_NAME" 
