@@ -41,10 +41,12 @@ jobs:
             if [[ $prname == *"/uat/"* ]]; then
               echo "Retrieving shortname from uat metadata"
               SHORT_NAME=$(cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "${COLLECTION_ID}")' |jq -r '.umm.ShortName')
+              echo "Found short name $SHORT_NAME"
             fi
             if [[ $prname == *"/ops/"* ]]; then
               echo "Retrieving shortname from ops metadata"
               SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "${COLLECTION_ID}")' |jq -r '.umm.ShortName')
+              echo "Found short name $SHORT_NAME"
             fi
             echo "SHORT_NAME=$SHORT_NAME" 
           done <branches2.list
