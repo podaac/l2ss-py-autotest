@@ -33,9 +33,6 @@ jobs:
 
           ls -al
 
-          cat cmr_metadata.json
-      
-
           while read prname; do
             echo "$prname" 
             COLLECTION_ID=$(echo $prname |sed -E 's/diff\/[uatops]+\///')
