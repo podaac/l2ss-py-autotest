@@ -19,15 +19,20 @@ jobs:
         with: 
           token: ${{ steps.podaac-cicd.outputs.token }}
 
-      - name: retrieve list of open PRs
+      - name: Download the metadata files
         env:
           GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
         run: |
           curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
           curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata_uat.json
 
-          
+          jq cmr_metadata_uat.json -r
 
+
+      - name: retrieve list of open PRs
+        env:
+          GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
+        run: |
           gh pr list --state open --label autotest --limit 500 >branches.list
           cat branches.list|grep diff\/ |sed 's|^.*diff/|diff/|g' |sed 's|\t.*||g' >branches2.list
 
