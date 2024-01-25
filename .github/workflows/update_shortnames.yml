@@ -26,7 +26,7 @@ jobs:
           curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
           curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata_uat.json
 
-          cat cmr_metadata_uat.json |jq -r '.items[]'
+          cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "C1254854962-LARC_CLOUD")' | jq -r '.umm.ShortName'
 
       - name: retrieve list of open PRs
         env:
