@@ -44,11 +44,13 @@ jobs:
             SHORT_NAME=""
             if [[ $prname == *"/uat/"* ]]; then
               echo "Retrieving shortname from uat metadata"
+              cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")' | jq -r '.umm.ShortName'
               SHORT_NAME=$(cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "${COLLECTION_ID}")' |jq -r '.umm.ShortName')
               echo "Found short name $SHORT_NAME"
             fi
             if [[ $prname == *"/ops/"* ]]; then
               echo "Retrieving shortname from ops metadata"
+              cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")' | jq -r '.umm.ShortName'
               SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "${COLLECTION_ID}")' |jq -r '.umm.ShortName')
               echo "cat cmr_metadata.json | jq -r '.items[] | select(.meta.""concept-id"" == ""${COLLECTION_ID}"")' |jq -r '.umm.ShortName'"
               echo "Found short name $SHORT_NAME"
