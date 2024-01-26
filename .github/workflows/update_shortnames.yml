@@ -37,13 +37,16 @@ jobs:
 
           ls -al
 
-          cat cmr_metadata_uat.json | jq -r '.items[]'
-          exit
 
 
           while read prname; do
             echo "$prname" 
             COLLECTION_ID=$(echo $prname |sed -E 's/diff\/[uatops]+\///')
+
+            cat cmr_metadata_uat.json | jq -r '.items[]'
+            exit
+
+
             echo "Searching for shortname for collection $COLLECTION_ID"
             SHORT_NAME=""
             if [[ $prname == *"/uat/"* ]]; then
