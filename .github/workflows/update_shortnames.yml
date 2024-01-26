@@ -42,8 +42,8 @@ jobs:
           while read prname; do
             echo "$prname" 
             COLLECTION_ID=$(echo $prname |sed -E 's/diff\/[uatops]+\///')
-            echo "$COLLECTION_ID
-            cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta.""concept-id"" == ""$COLLECTION_ID"")'
+            echo "$COLLECTION_ID"
+            cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")'
             exit
 
 
