@@ -13,11 +13,14 @@ import podaac.subsetter.subset
 import pytest
 import requests
 import xarray
+from datatree import DataTree
+
 from requests.auth import HTTPBasicAuth
 
 import cmr
 
 assert cfxr, "cf_xarray adds extensions to xarray on import"
+GROUP_DELIM = '__'
 
 @pytest.fixture(scope="session")
 def env(pytestconfig):
@@ -155,6 +158,62 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
 
     return variables
 
+def transform_grouped_dataset(nc_dataset) -> netCDF4.Dataset:
+    """
+    Transform a netCDF4 Dataset that has groups to an xarray compatible
+
+    """
+    # Close the existing read-only dataset and reopen in append mode
+    #nc_dataset.close()
+    #nc_dataset = netCDF4.Dataset(file_to_subset, 'r+')
+
+    dimensions = {}
+
+    def walk(group_node, path):
+        for key, item in group_node.items():
+            group_path = f'{path}{GROUP_DELIM}{key}'
+
+            # If there are variables in this group, copy to root group
+            # and then delete from current group
+            if item.variables:
+                # Copy variables to root group with new name
+                for var_name, var in item.variables.items():
+                    var_group_name = f'{group_path}{GROUP_DELIM}{var_name}'
+                    nc_dataset.variables[var_group_name] = var
+                # Delete variables
+                var_names = list(item.variables.keys())
+                for var_name in var_names:
+                    del item.variables[var_name]
+
+            if item.dimensions:
+                dims = list(item.dimensions.keys())
+                for dim_name in dims:
+                    new_dim_name = f'{group_path.replace("/", GROUP_DELIM)}{GROUP_DELIM}{dim_name}'
+                    item.dimensions[new_dim_name] = item.dimensions[dim_name]
+                    dimensions[new_dim_name] = item.dimensions[dim_name]
+                    item.renameDimension(dim_name, new_dim_name)
+
+            # If there are subgroups in this group, call this function
+            # again on that group.
+            if item.groups:
+                walk(item.groups, group_path)
+
+        # Delete non-root groups
+        group_names = list(group_node.keys())
+        for group_name in group_names:
+            del group_node[group_name]
+
+    for var_name in list(nc_dataset.variables.keys()):
+        new_var_name = f'{GROUP_DELIM}{var_name}'
+        nc_dataset.variables[new_var_name] = nc_dataset.variables[var_name]
+        del nc_dataset.variables[var_name]
+
+    walk(nc_dataset.groups, '')
+
+    # Update the dimensions of the dataset in the root group
+    nc_dataset.dimensions.update(dimensions)
+
+    return nc_dataset
 
 def get_bounding_box(granule_umm_json):
     # Find Bounding box for granule
@@ -191,6 +250,13 @@ def get_bounding_box(granule_umm_json):
         south = bounding_box.get('SouthBoundingCoordinate')
         west = bounding_box.get('WestBoundingCoordinate')
         east = bounding_box.get('EastBoundingCoordinate')
+    
+    except ValueError:
+        # MLS collection has a global domain
+        north = 20
+        south = -20
+        west = -100
+        east = 100
 
     return north, south, east, west
 
@@ -259,7 +325,7 @@ def create_smaller_bounding_box(east, west, north, south, scale_factor):
     return smaller_east, smaller_west, smaller_north, smaller_south
 
 
-def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: List[Dict]):
+def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collection_variable_list: List[Dict]):
     # Try getting it from UMM-Var first
     lat_var_json, lon_var_json, _ = get_coordinate_vars_from_umm(collection_variable_list)
     lat_var_name = get_variable_name_from_umm_json(lat_var_json)
@@ -278,11 +344,29 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
 
     # If that still doesn't work, try using l2ss-py directly
     try:
-        lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(dataset)
+        shutil.copy(file_to_subset, 'my_copy_file.nc')
+        nc_dataset = netCDF4.Dataset('my_copy_file.nc', mode='r+')
+        nc_dataset_flattened = transform_grouped_dataset(nc_dataset)
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+                }
+        with xarray.open_dataset(
+            xarray.backends.NetCDF4DataStore(nc_dataset_flattened),
+            **args
+            ) as flat_dataset:
+                lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(flat_dataset)
+
         if lat_var_names and lon_var_names:
-            lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
-            lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
-            return lat_var_name, lon_var_name
+            lat_var_name = lat_var_names.split('__')[-1] if isinstance(lat_var_names, str) else lat_var_names[0].split('__')[-1]
+            lon_var_name = lon_var_names.split('__')[-1] if isinstance(lon_var_names, str) else lon_var_names[0].split('__')[-1]
+            #lat_var_name = [var.replace('__', '/') for var in lat_var_name]
+            #lon_var_name = [var.replace('__', '/') for var in lon_var_name]
+            #print (lat_var_name)
+            #raise Exception
+            return lat_var_name, lon_var_name #, flat_dataset
     except ValueError:
         logging.warning("Unable to find lat/lon vars using l2ss-py")
 
@@ -337,16 +421,42 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     subsetted_ds = xarray.open_dataset(subsetted_filepath, decode_times=False)
     group = None
     # Try to read group in file
+    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables)
+    print (lat_var_name)
+    group_list = []
     with netCDF4.Dataset(subsetted_filepath) as f:
-        for g in f.groups:
-            ds = xarray.open_dataset(subsetted_filepath, group=g, decode_times=False)
-            if len(ds.variables):
-                group = g
-                subsetted_ds = ds
-            else:
-                ds.close()
+        group_list = []
+        def group_walk(groups, nc_d, current_group):
+            group_list.append(current_group)
+            print (group_list)
+            for g in groups:
+                if lat_var_name in list(nc_d.groups[g].variables.keys()):
+                    group_list.append(g)
+                    g = '/'.join(group_list)
+                    print (g, 'this group has latitude')
+                    global subsetted_ds_new
+                    subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=g, decode_times=False)
+                    print (subsetted_ds_new)
+                    break
+                if len(list(nc_d.groups[g].groups.keys())) > 0:
+                    group_walk(nc_d.groups[g].groups, nc_d.groups[g], g)
+                
+                else:
+                    continue
 
-    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables)
+        group_walk(f.groups, f, '')
+        """ds = xarray.open_dataset(subsetted_filepath, group=g, decode_times=False)
+        print (list(ds.variables.keys()))
+        if lat_var_name in list(ds.variables.keys()):
+            group = g
+            print (group)
+            subsetted_ds = ds
+        else:
+            ds.close()"""
+    #print (list(subsetted_ds.variables.keys()))
+    #print (subsetted_ds_new)
+    #lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables)
+
     assert lat_var_name and lon_var_name
 
     if science_vars := get_science_vars(collection_variables):
@@ -354,18 +464,20 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             science_var_name = science_vars[0]['umm']['Name']
     else:
         # Can't find a science var in UMM-V, just pick one
-        science_var_name = next(iter([v for v in subsetted_ds.data_vars if
-                                      str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
+        print (list(subsetted_ds_new.variables.keys()))
+        science_var_name = next(iter([v for v in subsetted_ds_new.variables if
+                                    str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
-    var_ds = subsetted_ds[science_var_name]
+    var_ds = subsetted_ds_new[science_var_name]
 
     try:
         msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-        llat = subsetted_ds[lat_var_name].where(msk)
-        llon = subsetted_ds[lon_var_name].where(msk)
+        llat = subsetted_ds_new[lat_var_name].where(msk)
+        llon = subsetted_ds_new[lon_var_name].where(msk)
     except ValueError:
-        llat = subsetted_ds[lat_var_name]
-        llon = subsetted_ds[lon_var_name]
+        
+        llat = subsetted_ds_new[lat_var_name]
+        llon = subsetted_ds_new[lon_var_name]
 
     lat_max = llat.max()
     lat_min = llat.min()
@@ -376,8 +488,8 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     lon_min = (lon_min + 180) % 360 - 180
     lon_max = (lon_max + 180) % 360 - 180
 
-    lat_var_fill_value = subsetted_ds[lat_var_name].encoding.get('_FillValue')
-    lon_var_fill_value = subsetted_ds[lon_var_name].encoding.get('_FillValue')
+    lat_var_fill_value = subsetted_ds_new[lat_var_name].encoding.get('_FillValue')
+    lon_var_fill_value = subsetted_ds_new[lon_var_name].encoding.get('_FillValue')
 
     if lat_var_fill_value:
         if (lat_max <= north or np.isclose(lat_max, north)) and (lat_min >= south or np.isclose(lat_min, south)):
