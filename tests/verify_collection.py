@@ -348,8 +348,10 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
 
     # If that still doesn't work, try using l2ss-py directly
     try:
+        # file not able to be flattened unless locally downloaded
         shutil.copy(file_to_subset, 'my_copy_file.nc')
         nc_dataset = netCDF4.Dataset('my_copy_file.nc', mode='r+')
+        # flatten the dataset
         nc_dataset_flattened = transform_grouped_dataset(nc_dataset)
 
         args = {
@@ -357,17 +359,20 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
                 'mask_and_scale': False,
                 'decode_times': False
                 }
+        
         with xarray.open_dataset(
             xarray.backends.NetCDF4DataStore(nc_dataset_flattened),
             **args
             ) as flat_dataset:
+                # use l2ss-py to find lat and lon names
                 lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(flat_dataset)
-                
+
         os.remove('my_copy_file.nc')
         if lat_var_names and lon_var_names:
             lat_var_name = lat_var_names.split('__')[-1] if isinstance(lat_var_names, str) else lat_var_names[0].split('__')[-1]
             lon_var_name = lon_var_names.split('__')[-1] if isinstance(lon_var_names, str) else lon_var_names[0].split('__')[-1]
             return lat_var_name, lon_var_name
+        
     except ValueError:
         logging.warning("Unable to find lat/lon vars using l2ss-py")
 
