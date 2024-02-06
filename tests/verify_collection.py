@@ -338,7 +338,11 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
 
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
     try:
-        return dataset.cf.coordinates['latitude'][0], dataset.cf.coordinates['longitude'][0]
+        latitude = [lat for lat in dataset.cf.coordinates['latitude']
+                         if lat.lower() == 'lat' or lat.lower() == 'latitude'][0]
+        longitude = [lon for lon in dataset.cf.coordinates['longitude']
+                         if lon.lower() == 'lon' or lon.lower() == 'longitude'][0]
+        return latitude, longitude
     except:
         logging.warning("Unable to find lat/lon vars using cf_xarray")
 
@@ -422,40 +426,37 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     group = None
     # Try to read group in file
     lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables)
-    print (lat_var_name)
-    group_list = []
+
     with netCDF4.Dataset(subsetted_filepath) as f:
         group_list = []
         def group_walk(groups, nc_d, current_group):
-            group_list.append(current_group)
-            print (group_list)
+            global subsetted_ds_new
+            subsetted_ds_new = None
+            # check if the top group has lat or lon variable
+            if lat_var_name in list(nc_d.variables.keys()) and current_group=='':
+                subsetted_ds_new = subsetted_ds
+            else:
+                # if not then we'll need to keep track of the group layers
+                group_list.append(current_group)
+            # loop through the groups in the current layer
             for g in groups:
+                # end the loop if we've already found latitude
+                if subsetted_ds_new:
+                    break
+                # check if the groups have latitude, define the dataset and end the loop if found
                 if lat_var_name in list(nc_d.groups[g].variables.keys()):
                     group_list.append(g)
                     g = '/'.join(group_list)
-                    print (g, 'this group has latitude')
-                    global subsetted_ds_new
                     subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=g, decode_times=False)
-                    print (subsetted_ds_new)
                     break
+                # recall the function on a group that has groups in it and didn't find latitude
+                # this is going 'deeper' into the groups
                 if len(list(nc_d.groups[g].groups.keys())) > 0:
                     group_walk(nc_d.groups[g].groups, nc_d.groups[g], g)
-                
                 else:
                     continue
 
         group_walk(f.groups, f, '')
-        """ds = xarray.open_dataset(subsetted_filepath, group=g, decode_times=False)
-        print (list(ds.variables.keys()))
-        if lat_var_name in list(ds.variables.keys()):
-            group = g
-            print (group)
-            subsetted_ds = ds
-        else:
-            ds.close()"""
-    #print (list(subsetted_ds.variables.keys()))
-    #print (subsetted_ds_new)
-    #lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables)
 
     assert lat_var_name and lon_var_name
 
