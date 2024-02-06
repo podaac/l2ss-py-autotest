@@ -362,15 +362,12 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
             **args
             ) as flat_dataset:
                 lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(flat_dataset)
-
+                
+        os.remove('my_copy_file.nc')
         if lat_var_names and lon_var_names:
             lat_var_name = lat_var_names.split('__')[-1] if isinstance(lat_var_names, str) else lat_var_names[0].split('__')[-1]
             lon_var_name = lon_var_names.split('__')[-1] if isinstance(lon_var_names, str) else lon_var_names[0].split('__')[-1]
-            #lat_var_name = [var.replace('__', '/') for var in lat_var_name]
-            #lon_var_name = [var.replace('__', '/') for var in lon_var_name]
-            #print (lat_var_name)
-            #raise Exception
-            return lat_var_name, lon_var_name #, flat_dataset
+            return lat_var_name, lon_var_name
     except ValueError:
         logging.warning("Unable to find lat/lon vars using l2ss-py")
 
