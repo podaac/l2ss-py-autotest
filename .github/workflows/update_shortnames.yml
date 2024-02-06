@@ -1,0 +1,70 @@
+name: Update Shortnames for all PRs
+on:
+    workflow_dispatch:
+#    schedule: 
+#      - cron:  '00 5 * * *'
+
+jobs:
+  update_shortnames:
+    runs-on: ubuntu-latest
+    name: Update shortnames for PRs without shortnames
+    steps:
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+        with: 
+          token: ${{ steps.podaac-cicd.outputs.token }}
+
+      - name: Download the metadata files
+        env:
+          GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
+        run: |
+          curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
+          curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata_uat.json
+
+          cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "C1254854962-LARC_CLOUD")' | jq -r '.umm.ShortName'
+
+      - name: retrieve list of open PRs
+        env:
+          GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
+        run: |
+          gh pr list --state open --label autotest --limit 500 >branches.list
+          cat branches.list|grep diff\/ |sed 's|^.*diff/|diff/|g' |sed 's|\t.*||g' >branches2.list
+
+          ls -al
+
+
+
+          while read prname; do
+            echo "$prname" 
+            COLLECTION_ID=$(echo $prname |sed -E 's/diff\/[uatops]+\///')
+            echo "$COLLECTION_ID"
+            # cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "'$COLLECTION_ID'")' |jq -r '.umm.ShortName'
+            # exit
+
+
+            echo "Searching for shortname for collection $COLLECTION_ID"
+            SHORT_NAME=""
+            if [[ $prname == *"/uat/"* ]]; then
+              echo "Retrieving shortname from uat metadata"
+              cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")' | jq -r '.umm.ShortName'
+              SHORT_NAME=$(cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "'$COLLECTION_ID'")' |jq -r '.umm.ShortName')
+              echo "Found short name $SHORT_NAME"
+            fi
+            if [[ $prname == *"/ops/"* ]]; then
+              echo "Retrieving shortname from ops metadata"
+              cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")' | jq -r '.umm.ShortName'
+              SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "'$COLLECTION_ID'")' |jq -r '.umm.ShortName')
+              echo "Found short name $SHORT_NAME"
+            fi
+            echo "SHORT_NAME=$SHORT_NAME" 
+          done <branches2.list
+
+#          COLLECTION_ID=$(echo ${{ github.event.pull_request.title }} |sed -E 's/[A-Z+] //' |sed -E 's/ \(.*//' )
+#          cd $GITHUB_WORKSPACE
+#          SHORT_NAME=$(cat cmr_metadata.json | jq -r '.items[] | select(.meta."concept-id" == "$COLLECTION_ID")' |jq -r '.umm.ShortName')
+#          echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV

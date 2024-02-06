@@ -236,12 +236,16 @@ def get_bounding_box(granule_umm_json):
             for point in points:
                 longitude_list.append(point.get('Longitude'))
                 latitude_list.append(point.get('Latitude'))
+
+        if not longitude_list or not latitude_list:  # Check if either list is empty
+            raise ValueError("Empty longitude or latitude list")
+
         north = max(latitude_list)
         south = min(latitude_list)
         west = min(longitude_list)
         east = max(longitude_list)
 
-    except KeyError:
+    except (KeyError, ValueError):
 
         bounding_box = granule_umm_json['umm']['SpatialExtent']['HorizontalSpatialDomain']['Geometry'][
             'BoundingRectangles'][0]
