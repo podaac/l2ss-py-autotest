@@ -13,7 +13,6 @@ import podaac.subsetter.subset
 import pytest
 import requests
 import xarray
-from datatree import DataTree
 
 from requests.auth import HTTPBasicAuth
 
