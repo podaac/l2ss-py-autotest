@@ -253,13 +253,6 @@ def get_bounding_box(granule_umm_json):
         south = bounding_box.get('SouthBoundingCoordinate')
         west = bounding_box.get('WestBoundingCoordinate')
         east = bounding_box.get('EastBoundingCoordinate')
-    
-    except ValueError:
-        # MLS collection has a global domain
-        north = 20
-        south = -20
-        west = -100
-        east = 100
 
     return north, south, east, west
 
