@@ -18,6 +18,9 @@ from requests.auth import HTTPBasicAuth
 
 import cmr
 
+VALID_LATITUDE_VARIABLE_NAMES = ['lat', 'latitude']
+VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
+
 assert cfxr, "cf_xarray adds extensions to xarray on import"
 GROUP_DELIM = '__'
 
@@ -335,9 +338,9 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
     try:
         latitude = [lat for lat in dataset.cf.coordinates['latitude']
-                         if lat.lower() == 'lat' or lat.lower() == 'latitude'][0]
+                         if lat.lower() in VALID_LATITUDE_VARIABLE_NAMES][0]
         longitude = [lon for lon in dataset.cf.coordinates['longitude']
-                         if lon.lower() == 'lon' or lon.lower() == 'longitude'][0]
+                         if lon.lower() in VALID_LONGITUDE_VARIABLE_NAMES][0]
         return latitude, longitude
     except:
         logging.warning("Unable to find lat/lon vars using cf_xarray")
@@ -431,11 +434,12 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             global subsetted_ds_new
             subsetted_ds_new = None
             # check if the top group has lat or lon variable
-            if lat_var_name in list(nc_d.variables.keys()) and current_group=='':
+            if lat_var_name in list(nc_d.variables.keys()):
                 subsetted_ds_new = subsetted_ds
             else:
                 # if not then we'll need to keep track of the group layers
                 group_list.append(current_group)
+
             # loop through the groups in the current layer
             for g in groups:
                 # end the loop if we've already found latitude
