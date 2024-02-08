@@ -130,7 +130,7 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/tests/cmr/ops
           echo "${{ matrix.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/ops/${{ matrix.concept_id }}
-      - name: Create Pull Request
+      - name: Create Pull Request for ${{ env.SHORT_NAME }}
         id: cpr
         uses: peter-evans/create-pull-request@v5
         with:
