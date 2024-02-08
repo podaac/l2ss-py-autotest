@@ -462,16 +462,27 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     assert lat_var_name and lon_var_name
 
+    var_ds = None
+    msk = None
+
     if science_vars := get_science_vars(collection_variables):
         for idx, value in enumerate(science_vars):
             science_var_name = science_vars[0]['umm']['Name']
+            try:
+                var_ds = subsetted_ds[science_var_name]
+                msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
+                break
+            except Exception:
+                var_ds = None
+                msk = None
+
     else:
         # Can't find a science var in UMM-V, just pick one
-        print (list(subsetted_ds_new.variables.keys()))
+
         science_var_name = next(iter([v for v in subsetted_ds_new.variables if
                                     str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
-    var_ds = subsetted_ds_new[science_var_name]
+    var_ds = subsetted_ds[science_var_name]
 
     try:
         msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
