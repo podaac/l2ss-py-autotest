@@ -160,62 +160,6 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
 
     return variables
 
-def transform_grouped_dataset(nc_dataset) -> netCDF4.Dataset:
-    """
-    Transform a netCDF4 Dataset that has groups to an xarray compatible
-
-    """
-    # Close the existing read-only dataset and reopen in append mode
-    #nc_dataset.close()
-    #nc_dataset = netCDF4.Dataset(file_to_subset, 'r+')
-
-    dimensions = {}
-
-    def walk(group_node, path):
-        for key, item in group_node.items():
-            group_path = f'{path}{GROUP_DELIM}{key}'
-
-            # If there are variables in this group, copy to root group
-            # and then delete from current group
-            if item.variables:
-                # Copy variables to root group with new name
-                for var_name, var in item.variables.items():
-                    var_group_name = f'{group_path}{GROUP_DELIM}{var_name}'
-                    nc_dataset.variables[var_group_name] = var
-                # Delete variables
-                var_names = list(item.variables.keys())
-                for var_name in var_names:
-                    del item.variables[var_name]
-
-            if item.dimensions:
-                dims = list(item.dimensions.keys())
-                for dim_name in dims:
-                    new_dim_name = f'{group_path.replace("/", GROUP_DELIM)}{GROUP_DELIM}{dim_name}'
-                    item.dimensions[new_dim_name] = item.dimensions[dim_name]
-                    dimensions[new_dim_name] = item.dimensions[dim_name]
-                    item.renameDimension(dim_name, new_dim_name)
-
-            # If there are subgroups in this group, call this function
-            # again on that group.
-            if item.groups:
-                walk(item.groups, group_path)
-
-        # Delete non-root groups
-        group_names = list(group_node.keys())
-        for group_name in group_names:
-            del group_node[group_name]
-
-    for var_name in list(nc_dataset.variables.keys()):
-        new_var_name = f'{GROUP_DELIM}{var_name}'
-        nc_dataset.variables[new_var_name] = nc_dataset.variables[var_name]
-        del nc_dataset.variables[var_name]
-
-    walk(nc_dataset.groups, '')
-
-    # Update the dimensions of the dataset in the root group
-    nc_dataset.dimensions.update(dimensions)
-
-    return nc_dataset
 
 def get_bounding_box(granule_umm_json):
     # Find Bounding box for granule
@@ -351,7 +295,7 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
         shutil.copy(file_to_subset, 'my_copy_file.nc')
         nc_dataset = netCDF4.Dataset('my_copy_file.nc', mode='r+')
         # flatten the dataset
-        nc_dataset_flattened = transform_grouped_dataset(nc_dataset)
+        nc_dataset_flattened = podaac.subsetter.group_handling.transform_grouped_dataset(nc_dataset, 'my_copy_file.nc')
 
         args = {
                 'decode_coords': False,
@@ -469,7 +413,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         for idx, value in enumerate(science_vars):
             science_var_name = science_vars[0]['umm']['Name']
             try:
-                var_ds = subsetted_ds[science_var_name]
+                var_ds = subsetted_ds_new[science_var_name]
                 msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
                 break
             except Exception:
@@ -482,7 +426,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         science_var_name = next(iter([v for v in subsetted_ds_new.variables if
                                     str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
-    var_ds = subsetted_ds[science_var_name]
+    var_ds = subsetted_ds_new[science_var_name]
 
     try:
         msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
