@@ -86,10 +86,6 @@ jobs:
             exit 1
           fi
           
-          #curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_UAT }}" >cmr_metadata.json
-          #SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
-          #SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
-          
           echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
 
       - uses: getsentry/action-github-app-token@v2
@@ -164,10 +160,6 @@ jobs:
             echo "All retries failed. SHORT_NAME is still null or 'null'."
             exit 1
           fi
-
-          #curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
-          #SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
-          #SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
           
           echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
 
