@@ -13,11 +13,16 @@ import podaac.subsetter.subset
 import pytest
 import requests
 import xarray
+
 from requests.auth import HTTPBasicAuth
 
 import cmr
 
+VALID_LATITUDE_VARIABLE_NAMES = ['lat', 'latitude']
+VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
+
 assert cfxr, "cf_xarray adds extensions to xarray on import"
+GROUP_DELIM = '__'
 
 @pytest.fixture(scope="session")
 def env(pytestconfig):
@@ -263,7 +268,7 @@ def create_smaller_bounding_box(east, west, north, south, scale_factor):
     return smaller_east, smaller_west, smaller_north, smaller_south
 
 
-def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: List[Dict]):
+def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collection_variable_list: List[Dict]):
     # Try getting it from UMM-Var first
     lat_var_json, lon_var_json, _ = get_coordinate_vars_from_umm(collection_variable_list)
     lat_var_name = get_variable_name_from_umm_json(lat_var_json)
@@ -276,17 +281,41 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, collection_variable_list: Lis
 
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
     try:
-        return dataset.cf.coordinates['latitude'][0], dataset.cf.coordinates['longitude'][0]
+        latitude = [lat for lat in dataset.cf.coordinates['latitude']
+                         if lat.lower() in VALID_LATITUDE_VARIABLE_NAMES][0]
+        longitude = [lon for lon in dataset.cf.coordinates['longitude']
+                         if lon.lower() in VALID_LONGITUDE_VARIABLE_NAMES][0]
+        return latitude, longitude
     except:
         logging.warning("Unable to find lat/lon vars using cf_xarray")
 
     # If that still doesn't work, try using l2ss-py directly
     try:
-        lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(dataset)
+        # file not able to be flattened unless locally downloaded
+        shutil.copy(file_to_subset, 'my_copy_file.nc')
+        nc_dataset = netCDF4.Dataset('my_copy_file.nc', mode='r+')
+        # flatten the dataset
+        nc_dataset_flattened = podaac.subsetter.group_handling.transform_grouped_dataset(nc_dataset, 'my_copy_file.nc')
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+                }
+        
+        with xarray.open_dataset(
+            xarray.backends.NetCDF4DataStore(nc_dataset_flattened),
+            **args
+            ) as flat_dataset:
+                # use l2ss-py to find lat and lon names
+                lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(flat_dataset)
+
+        os.remove('my_copy_file.nc')
         if lat_var_names and lon_var_names:
-            lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
-            lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
+            lat_var_name = lat_var_names.split('__')[-1] if isinstance(lat_var_names, str) else lat_var_names[0].split('__')[-1]
+            lon_var_name = lon_var_names.split('__')[-1] if isinstance(lon_var_names, str) else lon_var_names[0].split('__')[-1]
             return lat_var_name, lon_var_name
+        
     except ValueError:
         logging.warning("Unable to find lat/lon vars using l2ss-py")
 
@@ -341,16 +370,40 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     subsetted_ds = xarray.open_dataset(subsetted_filepath, decode_times=False)
     group = None
     # Try to read group in file
-    with netCDF4.Dataset(subsetted_filepath) as f:
-        for g in f.groups:
-            ds = xarray.open_dataset(subsetted_filepath, group=g, decode_times=False)
-            if len(ds.variables):
-                group = g
-                subsetted_ds = ds
-            else:
-                ds.close()
+    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables)
 
-    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, collection_variables)
+    with netCDF4.Dataset(subsetted_filepath) as f:
+        group_list = []
+        def group_walk(groups, nc_d, current_group):
+            global subsetted_ds_new
+            subsetted_ds_new = None
+            # check if the top group has lat or lon variable
+            if lat_var_name in list(nc_d.variables.keys()):
+                subsetted_ds_new = subsetted_ds
+            else:
+                # if not then we'll need to keep track of the group layers
+                group_list.append(current_group)
+
+            # loop through the groups in the current layer
+            for g in groups:
+                # end the loop if we've already found latitude
+                if subsetted_ds_new:
+                    break
+                # check if the groups have latitude, define the dataset and end the loop if found
+                if lat_var_name in list(nc_d.groups[g].variables.keys()):
+                    group_list.append(g)
+                    g = '/'.join(group_list)
+                    subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=g, decode_times=False)
+                    break
+                # recall the function on a group that has groups in it and didn't find latitude
+                # this is going 'deeper' into the groups
+                if len(list(nc_d.groups[g].groups.keys())) > 0:
+                    group_walk(nc_d.groups[g].groups, nc_d.groups[g], g)
+                else:
+                    continue
+
+        group_walk(f.groups, f, '')
+
     assert lat_var_name and lon_var_name
 
     var_ds = None
@@ -360,7 +413,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         for idx, value in enumerate(science_vars):
             science_var_name = science_vars[0]['umm']['Name']
             try:
-                var_ds = subsetted_ds[science_var_name]
+                var_ds = subsetted_ds_new[science_var_name]
                 msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
                 break
             except Exception:
@@ -369,28 +422,20 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     else:
         # Can't find a science var in UMM-V, just pick one
-        for v in subsetted_ds.data_vars:
-            if str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v):
-                science_var_name = v
 
-                try:
-                    var_ds = subsetted_ds[science_var_name]
-                    msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-                    break
-                except Exception:
-                    var_ds = None
-                    msk = None
+        science_var_name = next(iter([v for v in subsetted_ds_new.variables if
+                                    str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
-    if var_ds is None and msk is None:
-        pytest.fail(f"Unable to find a science variable")
+    var_ds = subsetted_ds_new[science_var_name]
 
     try:
         msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-        llat = subsetted_ds[lat_var_name].where(msk)
-        llon = subsetted_ds[lon_var_name].where(msk)
+        llat = subsetted_ds_new[lat_var_name].where(msk)
+        llon = subsetted_ds_new[lon_var_name].where(msk)
     except ValueError:
-        llat = subsetted_ds[lat_var_name]
-        llon = subsetted_ds[lon_var_name]
+        
+        llat = subsetted_ds_new[lat_var_name]
+        llon = subsetted_ds_new[lon_var_name]
 
     lat_max = llat.max()
     lat_min = llat.min()
@@ -401,8 +446,8 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     lon_min = (lon_min + 180) % 360 - 180
     lon_max = (lon_max + 180) % 360 - 180
 
-    lat_var_fill_value = subsetted_ds[lat_var_name].encoding.get('_FillValue')
-    lon_var_fill_value = subsetted_ds[lon_var_name].encoding.get('_FillValue')
+    lat_var_fill_value = subsetted_ds_new[lat_var_name].encoding.get('_FillValue')
+    lon_var_fill_value = subsetted_ds_new[lon_var_name].encoding.get('_FillValue')
 
     if lat_var_fill_value:
         if (lat_max <= north or np.isclose(lat_max, north)) and (lat_min >= south or np.isclose(lat_min, south)):
