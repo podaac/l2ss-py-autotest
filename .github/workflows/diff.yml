@@ -70,7 +70,7 @@ jobs:
             SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
             SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
 
-            if [ -n "$SHORT_NAME" ]; then
+            if [ -n "$SHORT_NAME" ] && [ "$SHORT_NAME" != "null" ]; then
               echo "Short Name: $SHORT_NAME"
               break
             else
@@ -144,7 +144,7 @@ jobs:
             SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
             SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
 
-            if [ -n "$SHORT_NAME" ]; then
+            if [ -n "$SHORT_NAME" ] && [ "$SHORT_NAME" != "null" ]; then
               echo "Short Name: $SHORT_NAME"
               break
             else
