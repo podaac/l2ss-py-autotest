@@ -59,10 +59,34 @@ jobs:
       - name: Get collection ShortName for readability
         run: |
           cd $GITHUB_WORKSPACE
-          curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_UAT }}" >cmr_metadata.json
-          SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
-          SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
+          
+          MAX_RETRIES=10
+          BACKOFF_DELAY=5
+          RETRY_COUNT=0
+
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_UAT }}" >cmr_metadata.json
+
+            SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
+            SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
+
+            if [ -n "$SHORT_NAME" ]; then
+              echo "Short Name: $SHORT_NAME"
+              break
+            else
+              ((RETRY_COUNT++))
+              echo "Retry #$RETRY_COUNT: SHORT_NAME is null. Retrying in $BACKOFF_DELAY seconds..."
+              sleep "$BACKOFF_DELAY"
+              BACKOFF_DELAY=$((BACKOFF_DELAY * 2))
+            fi
+          done
+
+          #curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_UAT }}" >cmr_metadata.json
+          #SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
+          #SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
+          
           echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
+
       - uses: getsentry/action-github-app-token@v2
         name: Get GH App token
         id: podaac-cicd
@@ -107,11 +131,36 @@ jobs:
     steps:
       - name: Get collection ShortName for readability
         run: |
+
+          MAX_RETRIES=10
+          BACKOFF_DELAY=5
+          RETRY_COUNT=0
+
           cd $GITHUB_WORKSPACE
-          curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
-          SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
-          SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
+          
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
+
+            SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
+            SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
+
+            if [ -n "$SHORT_NAME" ]; then
+              echo "Short Name: $SHORT_NAME"
+              break
+            else
+              ((RETRY_COUNT++))
+              echo "Retry #$RETRY_COUNT: SHORT_NAME is null. Retrying in $BACKOFF_DELAY seconds..."
+              sleep "$BACKOFF_DELAY"
+              BACKOFF_DELAY=$((BACKOFF_DELAY * 2))
+            fi
+          done
+
+          #curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
+          #SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
+          #SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
+          
           echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
+
       - uses: getsentry/action-github-app-token@v2
         name: Get GH App token
         id: podaac-cicd
