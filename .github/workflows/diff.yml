@@ -81,6 +81,11 @@ jobs:
             fi
           done
 
+          if [ "$RETRY_COUNT" -eq "$MAX_RETRIES" ]; then
+            echo "All retries failed. SHORT_NAME is still null or 'null'."
+            exit 1
+          fi
+          
           #curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_UAT }}" >cmr_metadata.json
           #SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
           #SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
@@ -155,6 +160,11 @@ jobs:
             fi
           done
 
+          if [ "$RETRY_COUNT" -eq "$MAX_RETRIES" ]; then
+            echo "All retries failed. SHORT_NAME is still null or 'null'."
+            exit 1
+          fi
+
           #curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
           #SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
           #SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
@@ -172,7 +182,7 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/tests/cmr/ops
           echo "${{ matrix.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/ops/${{ matrix.concept_id }}
-      - name: Create Pull Request
+      - name: Create Pull Request for ${{ env.SHORT_NAME }}
         id: cpr
         uses: peter-evans/create-pull-request@v5
         with:
