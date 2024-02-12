@@ -88,6 +88,38 @@ jobs:
           
           echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
 
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v3
+      - name: Update uat_associations
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/tests/cmr/uat
+          echo "${{ matrix.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/uat/${{ matrix.concept_id }}
+      - name: Create Pull Request for ${{ env.SHORT_NAME }}
+        id: cpr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ steps.podaac-cicd.outputs.token }}
+          commit-message: Add ${{ matrix.concept_id }}
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: diff/uat/${{ matrix.concept_id }}
+          delete-branch: true
+          title: UAT ${{ matrix.concept_id }} (${{ env.SHORT_NAME }})
+          body: |
+            New association between l2ss-py and ${{ matrix.concept_id }} found in UAT.
+            Beginning verification of collection.
+          labels: |
+            unverified
+            autotest
+      - name: Enable Pull Request Automerge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
   open_pr_ops:
     needs: find_new
     strategy:
@@ -131,6 +163,38 @@ jobs:
           
           echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
 
+      - uses: getsentry/action-github-app-token@v2
+        name: Get GH App token
+        id: podaac-cicd
+        with:
+          app_id: ${{ secrets.CICD_APP_ID }}
+          private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v3
+      - name: Update ops_associations
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/tests/cmr/ops
+          echo "${{ matrix.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/ops/${{ matrix.concept_id }}
+      - name: Create Pull Request for ${{ env.SHORT_NAME }}
+        id: cpr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ steps.podaac-cicd.outputs.token }}
+          commit-message: Add ${{ matrix.concept_id }}
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          branch: diff/ops/${{ matrix.concept_id }}
+          delete-branch: true
+          title: OPS ${{ matrix.concept_id }} (${{ env.SHORT_NAME }})
+          body: |
+            New association between l2ss-py and ${{ matrix.concept_id }} found in OPS.
+            Beginning verification of collection.
+          labels: |
+            unverified
+            autotest
+      - name: Enable Pull Request Automerge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
 
 
 
