@@ -34,60 +34,26 @@ jobs:
           ls $GITHUB_WORKSPACE/tests/cmr/uat/ > $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
           ls $GITHUB_WORKSPACE/tests/cmr/ops/ > $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
 
-          cat $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
-          cat $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+          poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt
+          poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt
 
-          echo "new_uat_associations=$(poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP)" >> $GITHUB_OUTPUT
-          echo "new_ops_associations=$(poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP)" >> $GITHUB_OUTPUT
+          echo "new_uat_associations=$(poetry run python tests/collection_names.py --env uat --token $UAT_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt)" >> $GITHUB_OUTPUT
+          echo "new_ops_associations=$(poetry run python tests/collection_names.py --env ops --token $OPS_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt)" >> $GITHUB_OUTPUT
 
           rm $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
           rm $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
-
-          #echo "new_uat_associations=[\"C1238658088-POCLOUD\",\"C1233154410-GES_DISC\",\"C1234666458-GES_DISC\",\"C1238621111-POCLOUD\",\"C1234666454-GES_DISC\",\"C1254989897-LARC_ASDC\",\"C1234666476-GES_DISC\",\"C1236469823-GES_DISC\",\"C1238621219-POCLOUD\",\"C1243175554-POCLOUD\"]" >> $GITHUB_OUTPUT
-          #echo "new_uat_associations=[\"C1238658088-POCLOUD\",\"C1233154410-GES_DISC\"]" >> $GITHUB_OUTPUT
-          #echo "new_ops_associations=[\"C1968979997-POCLOUD\"]" >> $GITHUB_OUTPUT
+          rm $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt
   open_pr_uat:
     needs: find_new
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        concept_id: ${{ fromJson(needs.find_new.outputs.new_uat_associations) }}
+        data: ${{fromJson(needs.find_new.outputs.new_uat_associations)}}
     runs-on: ubuntu-latest
-    name: UAT ${{ matrix.concept_id }}
+    name: UAT ${{ matrix.data.concept_id }} ${{ matrix.data.short_name }}
     steps:
-      - name: Get collection ShortName for readability
-        run: |
-          cd $GITHUB_WORKSPACE
-          
-          MAX_RETRIES=10
-          BACKOFF_DELAY=5
-          RETRY_COUNT=0
-
-          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
-            curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_UAT }}" >cmr_metadata.json
-
-            SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
-            SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
-
-            if [ -n "$SHORT_NAME" ] && [ "$SHORT_NAME" != "null" ]; then
-              echo "Short Name: $SHORT_NAME"
-              break
-            else
-              ((RETRY_COUNT++))
-              echo "Retry #$RETRY_COUNT: SHORT_NAME is null. Retrying in $BACKOFF_DELAY seconds..."
-              sleep "$BACKOFF_DELAY"
-              BACKOFF_DELAY=$((BACKOFF_DELAY * 2))
-            fi
-          done
-
-          if [ "$RETRY_COUNT" -eq "$MAX_RETRIES" ]; then
-            echo "All retries failed. SHORT_NAME is still null or 'null'."
-            exit 1
-          fi
-          
-          echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
-
       - uses: getsentry/action-github-app-token@v2
         name: Get GH App token
         id: podaac-cicd
@@ -98,20 +64,20 @@ jobs:
       - name: Update uat_associations
         run: |
           mkdir -p $GITHUB_WORKSPACE/tests/cmr/uat
-          echo "${{ matrix.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/uat/${{ matrix.concept_id }}
+          echo "${{ matrix.data.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/uat/${{ matrix.data.concept_id }}
       - name: Create Pull Request for ${{ env.SHORT_NAME }}
         id: cpr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ steps.podaac-cicd.outputs.token }}
-          commit-message: Add ${{ matrix.concept_id }}
+          commit-message: Add ${{ matrix.data.concept_id }}
           committer: GitHub <noreply@github.com>
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
-          branch: diff/uat/${{ matrix.concept_id }}
+          branch: diff/uat/${{ matrix.data.concept_id }}
           delete-branch: true
-          title: UAT ${{ matrix.concept_id }} (${{ env.SHORT_NAME }})
+          title: UAT ${{ matrix.data.concept_id }} (${{ matrix.data.short_name }})
           body: |
-            New association between l2ss-py and ${{ matrix.concept_id }} found in UAT.
+            New association between l2ss-py and ${{ matrix.data.concept_id }} found in UAT.
             Beginning verification of collection.
           labels: |
             unverified
@@ -120,49 +86,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
+  
+
   open_pr_ops:
     needs: find_new
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        concept_id: ${{ fromJson(needs.find_new.outputs.new_ops_associations) }}
+        data: ${{fromJson(needs.find_new.outputs.new_ops_associations)}}
     runs-on: ubuntu-latest
-    name: OPS ${{ matrix.concept_id }}
+    name: OPS ${{ matrix.data.concept_id }} ${{ matrix.data.short_name }}
     steps:
-      - name: Get collection ShortName for readability
-        run: |
-
-          MAX_RETRIES=10
-          BACKOFF_DELAY=5
-          RETRY_COUNT=0
-
-          cd $GITHUB_WORKSPACE
-          
-          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
-            curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?concept_id=${{ matrix.concept_id }}&token=${{ secrets.LAUNCHPAD_TOKEN_OPS }}" >cmr_metadata.json
-
-            SHORT_NAME=$(jq '.items[0].umm.ShortName' cmr_metadata.json)
-            SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/"//g')
-
-            if [ -n "$SHORT_NAME" ] && [ "$SHORT_NAME" != "null" ]; then
-              echo "Short Name: $SHORT_NAME"
-              break
-            else
-              ((RETRY_COUNT++))
-              echo "Retry #$RETRY_COUNT: SHORT_NAME is null. Retrying in $BACKOFF_DELAY seconds..."
-              sleep "$BACKOFF_DELAY"
-              BACKOFF_DELAY=$((BACKOFF_DELAY * 2))
-            fi
-          done
-
-          if [ "$RETRY_COUNT" -eq "$MAX_RETRIES" ]; then
-            echo "All retries failed. SHORT_NAME is still null or 'null'."
-            exit 1
-          fi
-          
-          echo "SHORT_NAME=$SHORT_NAME">>$GITHUB_ENV
-
       - uses: getsentry/action-github-app-token@v2
         name: Get GH App token
         id: podaac-cicd
@@ -173,20 +108,20 @@ jobs:
       - name: Update ops_associations
         run: |
           mkdir -p $GITHUB_WORKSPACE/tests/cmr/ops
-          echo "${{ matrix.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/ops/${{ matrix.concept_id }}
+          echo "${{ matrix.data.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/ops/${{ matrix.data.concept_id }}
       - name: Create Pull Request for ${{ env.SHORT_NAME }}
         id: cpr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ steps.podaac-cicd.outputs.token }}
-          commit-message: Add ${{ matrix.concept_id }}
+          commit-message: Add ${{ matrix.data.concept_id }}
           committer: GitHub <noreply@github.com>
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
-          branch: diff/ops/${{ matrix.concept_id }}
+          branch: diff/ops/${{ matrix.data.concept_id }}
           delete-branch: true
-          title: OPS ${{ matrix.concept_id }} (${{ env.SHORT_NAME }})
+          title: OPS ${{ matrix.data.concept_id }} (${{ matrix.data.short_name }})
           body: |
-            New association between l2ss-py and ${{ matrix.concept_id }} found in OPS.
+            New association between l2ss-py and ${{ matrix.data.concept_id }} found in OPS.
             Beginning verification of collection.
           labels: |
             unverified
@@ -195,3 +130,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
+  
