@@ -44,47 +44,54 @@ def main():
 
         offset = 0
         more_data = True
+
         while more_data:
-            # Define your GraphQL query
-            graphql_query_template = """
-                query {{
-                  collections(provider: "{provider}", limit: 2000, offset: {offset}) {{
-                    items {{
-                      conceptId
-                      shortName
+            
+            try:
+
+                # Define your GraphQL query
+                graphql_query_template = """
+                    query {{
+                      collections(provider: "{provider}", limit: 2000, offset: {offset}) {{
+                        items {{
+                          conceptId
+                          shortName
+                        }}
+                      }}
                     }}
-                  }}
-                }}
-            """
+                """
 
-            graphql_query = graphql_query_template.format(provider=provider,offset=offset)
+                graphql_query = graphql_query_template.format(provider=provider,offset=offset)
 
-            # Create the request payload
-            payload = {"query": graphql_query}
+                # Create the request payload
+                payload = {"query": graphql_query}
 
-            # Make the GraphQL request with headers
-            response = requests.post(url, headers=headers, json=payload)
+                # Make the GraphQL request with headers
+                response = requests.post(url, headers=headers, json=payload)
 
-            # Check the status code
-            if response.status_code == 200:
-                # Parse the JSON response
-                data = response.json().get('data').get('collections').get('items')
+                # Check the status code
+                if response.status_code == 200:
+                    # Parse the JSON response
+                    data = response.json().get('data').get('collections').get('items')
 
-                for item in data:
-                    concept_id = item.get('conceptId')
-                    if concept_id in collections_list:
-                        collections.append({
-                            'concept_id': concept_id,
-                            'short_name': item.get("shortName")
-                        })
+                    for item in data:
+                        concept_id = item.get('conceptId')
+                        if concept_id in collections_list:
+                            collections.append({
+                                'concept_id': concept_id,
+                                'short_name': item.get("shortName")
+                            })
 
-                if len(data) < 2000:
-                    more_data = False
+                    if len(data) < 2000:
+                        more_data = False
+                    else:
+                        offset += 2000
                 else:
-                    offset += 2000
-            else:
+                    more_data = False
+                    print(f"Error: {response.status_code}\n{response.text}")
+            
+            except Exception:
                 more_data = False
-                print(f"Error: {response.status_code}\n{response.text}")
 
     print(json.dumps(collections))
 
