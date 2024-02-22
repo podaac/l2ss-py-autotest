@@ -417,8 +417,16 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
                 msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
                 break
             except Exception:
-                var_ds = None
-                msk = None
+                try:
+                    # if the variable couldn't be found because the name includes a group, e.g.,
+                    # `geolocation/relative_azimuth_angle`,
+                    # then try to access the variable after removing the group name.
+                    var_ds = subsetted_ds_new[science_var_name.rsplit("/", 1)[-1]]
+                    msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
+                    break
+                except Exception:
+                    var_ds = None
+                    msk = None
 
     else:
         # Can't find a science var in UMM-V, just pick one
@@ -426,7 +434,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         science_var_name = next(iter([v for v in subsetted_ds_new.variables if
                                     str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
-    var_ds = subsetted_ds_new[science_var_name]
+        var_ds = subsetted_ds_new[science_var_name]
 
     try:
         msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
