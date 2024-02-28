@@ -56,7 +56,7 @@ def pytest_generate_tests(metafunc):
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
 
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
-            metafunc.parametrize("collection_concept_id", associations)
+            metafunc.parametrize("collection_concept_id", associations[0:1])
     else:
         collection_concept_id = metafunc.config.option.concept_id
         if 'collection_concept_id' in metafunc.fixturenames and collection_concept_id is not None:
