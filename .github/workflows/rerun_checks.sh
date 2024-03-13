@@ -2,7 +2,7 @@
 
 git fetch --all
 
-gh pr list --state open --label $1 --limit 500 >branches.list
+gh pr list --state open --label $1 --limit 2 >branches.list
 #git branch -r >branches.list
 
 #cat branches.list
