@@ -179,7 +179,7 @@ def create_or_update_issue(repo_name, github_token, env):
         # Load the JSON data from the file
         results = json.load(file)
 
-    failed = results.get('success',[])
+    failed = results.get('failed', [])
     skipped = results.get('skipped',[])
 
     providers = []

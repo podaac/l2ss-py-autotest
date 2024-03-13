@@ -1,8 +1,10 @@
+# Run every third day starting from the 3rd of the month 1 am pacific
 name: Re-Run Unverified PRs
 on:
     workflow_dispatch:
-#    schedule: 
-#      - cron:  '00 5 * * *'
+
+    schedule:
+      - cron: '0 8 3-31/3 * *'
 
 jobs:
   send_pull_requests:

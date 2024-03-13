@@ -1,11 +1,13 @@
-# This workflow scans CMR at 1 am pst each 3 days to check for new collection associations to the l2ss-py UMM-S record
-#  in UAT and OPS. If a new association is found, a PR is opened to add the new collection concept id to the
-#  cmr/*_associations.txt file.
+# Run every third day starting from the 2nd of the month 1 am pacific 
+# check for new collection associations to the l2ss-py UMM-S record
+# in UAT and OPS. If a new association is found, a PR is opened to add the new collection concept id to the
+# cmr/*_associations.txt file.
+
 name: Scan For New Associations
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 1 */3 * *'
+    - cron: '0 8 2-31/3 * *'
 
 jobs:
   find_new:

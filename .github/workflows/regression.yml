@@ -1,8 +1,11 @@
+# Run every third day starting from the 1st of the month 1 am pacific
+
 name: Regression
 
 on:
+
   schedule:
-    - cron: "30 9 * * 0,2,4,6" # Runs at 2:30 AM Pacific time every other day
+    - cron: '0 8 1-31/3 * *'
 
   workflow_dispatch:
 
