@@ -93,6 +93,11 @@ def main():
             except Exception:
                 more_data = False
 
+    file_path = f"{args.env}_new_collections.json"
+
+    with open(file_path, "w") as json_file:
+        json.dump(collections, json_file, indent=4)
+
     print(json.dumps(collections))
 
 if __name__ == "__main__":
