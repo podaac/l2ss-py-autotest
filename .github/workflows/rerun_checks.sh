@@ -17,6 +17,7 @@ while read branch; do
   echo "Branch: $branch"
   git checkout $branch
   git pull origin $branch
+  git merge main
   echo "git commit --allow-empty -m 'Triggering Autotest Workflow Re-Run'"
   git commit --allow-empty -m 'Triggering Autotest Workflow Re-Run'
   echo "git push origin $branch"
