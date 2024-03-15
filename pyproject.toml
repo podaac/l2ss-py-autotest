@@ -16,6 +16,7 @@ netCDF4 = "^1.6.4"
 xarray = "^2023.6.0"
 cf-xarray = "^0.8.3"
 l2ss-py = "^2.4.0"
+pygithub = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
