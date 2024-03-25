@@ -21,7 +21,7 @@ if __name__ == "__main__":
         for collection in data:
             concept_id = collection.get('concept_id')
             short_name = collection.get('short_name')
-            title = f"UAT {concept_id} ({short_name})"
+            title = f"OPS {concept_id} ({short_name})"
             new_collection_titles.append(title)
 
     # Replace these variables with your own values
