@@ -411,7 +411,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     if science_vars := get_science_vars(collection_variables):
         for idx, value in enumerate(science_vars):
-            science_var_name = science_vars[0]['umm']['Name']
+            science_var_name = science_vars[idx]['umm']['Name']
             try:
                 var_ds = subsetted_ds_new[science_var_name]
                 msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
