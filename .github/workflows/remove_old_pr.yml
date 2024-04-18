@@ -28,19 +28,19 @@ jobs:
         run: |
           poetry install
 
-          ls $GITHUB_WORKSPACE/tests/cmr/uat/ > $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
-          ls $GITHUB_WORKSPACE/tests/cmr/ops/ > $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+          ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
+          ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt
 
-          poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt
-          poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt
+          poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt --token $UAT_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
+          poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt --token $OPS_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt
 
-          poetry run python tests/collection_names.py --env uat --token $UAT_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt
-          poetry run python tests/collection_names.py --env ops --token $OPS_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt
+          poetry run python tests/collection_names.py --env uat --token $UAT_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
+          poetry run python tests/collection_names.py --env ops --token $OPS_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt
 
-          rm $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
-          rm $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
-          rm $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt
-          rm $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt
 
       - name: Remove Old prs
         env:
