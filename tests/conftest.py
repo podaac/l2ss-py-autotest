@@ -50,7 +50,7 @@ def pytest_addoption(parser):
 
 def pytest_generate_tests(metafunc):
     if metafunc.config.option.regression:
-        cmr_dirpath = pathlib.Path('cmr')
+        cmr_dirpath = pathlib.Path('cmr/l2ss-py')
 
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
