@@ -23,3 +23,5 @@ while read branch; do
   echo "git push origin $branch"
   git push origin $branch
 done <branches2.list  
+
+rm branches*.list
