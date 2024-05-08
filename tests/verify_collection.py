@@ -312,6 +312,7 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
 
         os.remove('my_copy_file.nc')
         if lat_var_names and lon_var_names:
+            print (lat_var_names)
             lat_var_name = lat_var_names.split('__')[-1] if isinstance(lat_var_names, str) else lat_var_names[0].split('__')[-1]
             lon_var_name = lon_var_names.split('__')[-1] if isinstance(lon_var_names, str) else lon_var_names[0].split('__')[-1]
             return lat_var_name, lon_var_name
@@ -368,15 +369,19 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     # Verify spatial subset worked
     subsetted_ds = xarray.open_dataset(subsetted_filepath, decode_times=False)
+    #print (subsetted_ds)
+    #raise Exception
     group = None
     # Try to read group in file
     lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables)
-
+    lat_var_name = lat_var_name.split('/')[-1]
+    lon_var_name = lon_var_name.split('/')[-1]
     with netCDF4.Dataset(subsetted_filepath) as f:
         group_list = []
         def group_walk(groups, nc_d, current_group):
             global subsetted_ds_new
             subsetted_ds_new = None
+            #print (nc_d)
             # check if the top group has lat or lon variable
             if lat_var_name in list(nc_d.variables.keys()):
                 subsetted_ds_new = subsetted_ds
@@ -433,7 +438,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     else:
         # Can't find a science var in UMM-V, just pick one
-
+        print (subsetted_ds_new)
         science_var_name = next(iter([v for v in subsetted_ds_new.variables if
                                     str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
