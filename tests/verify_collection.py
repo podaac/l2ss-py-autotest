@@ -432,8 +432,10 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
         if var_ds is None and msk is None:
             pytest.fail(f"Unable to find variable from umm-v to use as science variable.")
+
     else:
         # Can't find a science var in UMM-V, just pick one
+        
         science_var_name = next(iter([v for v in subsetted_ds_new.variables if
                                     str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
