@@ -1,7 +1,7 @@
 # Run every third day starting from the 2nd of the month 1 am pacific 
 # check for new collection associations to the l2ss-py UMM-S record
 # in UAT and OPS. If a new association is found, a PR is opened to add the new collection concept id to the
-# cmr/*_associations.txt file.
+# cmr/l2ss-py/*_associations.txt file.
 
 name: Scan For New Associations
 on:
@@ -33,19 +33,19 @@ jobs:
         run: |
           poetry install
 
-          ls $GITHUB_WORKSPACE/tests/cmr/uat/ > $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
-          ls $GITHUB_WORKSPACE/tests/cmr/ops/ > $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
+          ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
+          ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt
 
-          poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt --token $UAT_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt
-          poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt --token $OPS_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt
+          poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt --token $UAT_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
+          poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt --token $OPS_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt
 
-          echo "new_uat_associations=$(poetry run python tests/collection_names.py --env uat --token $UAT_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt)" >> $GITHUB_OUTPUT
-          echo "new_ops_associations=$(poetry run python tests/collection_names.py --env ops --token $OPS_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt)" >> $GITHUB_OUTPUT
+          echo "new_uat_associations=$(poetry run python tests/collection_names.py --env uat --token $UAT_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt)" >> $GITHUB_OUTPUT
+          echo "new_ops_associations=$(poetry run python tests/collection_names.py --env ops --token $OPS_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt)" >> $GITHUB_OUTPUT
 
-          rm $GITHUB_WORKSPACE/tests/cmr/uat_associations.txt
-          rm $GITHUB_WORKSPACE/tests/cmr/ops_associations.txt
-          rm $GITHUB_WORKSPACE/tests/cmr/new_uat_associations.txt
-          rm $GITHUB_WORKSPACE/tests/cmr/new_ops_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt
   open_pr_uat:
     needs: find_new
     strategy:
@@ -65,8 +65,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Update uat_associations
         run: |
-          mkdir -p $GITHUB_WORKSPACE/tests/cmr/uat
-          echo "${{ matrix.data.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/uat/${{ matrix.data.concept_id }}
+          mkdir -p $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat
+          echo "${{ matrix.data.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat/${{ matrix.data.concept_id }}
       - name: Create Pull Request for ${{ env.SHORT_NAME }}
         id: cpr
         uses: peter-evans/create-pull-request@v6
@@ -109,8 +109,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Update ops_associations
         run: |
-          mkdir -p $GITHUB_WORKSPACE/tests/cmr/ops
-          echo "${{ matrix.data.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/ops/${{ matrix.data.concept_id }}
+          mkdir -p $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops
+          echo "${{ matrix.data.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops/${{ matrix.data.concept_id }}
       - name: Create Pull Request for ${{ env.SHORT_NAME }}
         id: cpr
         uses: peter-evans/create-pull-request@v6
