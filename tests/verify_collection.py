@@ -371,6 +371,8 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     group = None
     # Try to read group in file
     lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables)
+    lat_var_name = lat_var_name.split('/')[-1]
+    lon_var_name = lon_var_name.split('/')[-1]
 
     with netCDF4.Dataset(subsetted_filepath) as f:
         group_list = []
