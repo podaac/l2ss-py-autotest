@@ -2,6 +2,14 @@
 
 git fetch --all
 
+# Fetch open PRs and enable auto-merge on each one
+pr_numbers=$(gh pr list --state open --json number | jq -r '.[].number')
+
+for pr_number in $pr_numbers; do
+    echo "Auto-merging PR number: $pr_number"
+    gh pr merge --merge --auto $pr_number
+done
+
 gh pr list --state open --label $1 --limit 500 >branches.list
 #git branch -r >branches.list
 
