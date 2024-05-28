@@ -1,7 +1,7 @@
 import os
 import requests
 import json
-
+from datetime import datetime
 
 def bearer_token(env):
     tokens = []
@@ -199,7 +199,7 @@ def create_or_update_issue(repo_name, github_token, env):
                 providers.append(provider)
 
         collection_names = get_collection_names(providers, env, all_collections)
-        issue_body = ""
+        issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
 
         if len(failed) > 0:
             issue_body += "\n FAILED: \n"
