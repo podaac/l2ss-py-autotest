@@ -13,6 +13,7 @@ import podaac.subsetter.subset
 import pytest
 import requests
 import xarray
+from urllib.parse import unquote 
 
 from requests.auth import HTTPBasicAuth
 
@@ -353,7 +354,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection, spatial=request_bbox,
                                       granule_id=[granule_json['meta']['concept-id']])
-    logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
+    logging.info("Sending harmony request %s", unquote(harmony_client.request_as_url(harmony_request)))
 
     # Submit harmony request and download result
     job_id = harmony_client.submit(harmony_request)
