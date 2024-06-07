@@ -17,6 +17,7 @@ xarray = "^2024.5.0"
 cf-xarray = "^0.9.1"
 l2ss-py = "^2.4.0"
 pygithub = "^2.2.0"
+pytest-xdist = "^3.6.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.1"
