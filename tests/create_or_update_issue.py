@@ -175,12 +175,25 @@ def create_or_update_issue(repo_name, github_token, env):
     issue_title = f"Regression test for {upper_env} ISSUES"
 
     results_file = f'{env}_regression_results.json'
+    current_associations_file = f'{env}_associations.json'
+  
     with open(results_file, 'r') as file:
-        # Load the JSON data from the file
         results = json.load(file)
+
+    with open(current_associations_file, 'r') as file:
+        current_associations = json.load(file)
 
     failed = results.get('failed', [])
     skipped = results.get('skipped',[])
+    
+    no_associations = []
+    failed_test = []
+
+    for collection in failed: 
+        if collection not in current_associations:
+            no_associations.append(collection)
+        else:
+            failed_test.append(collection)
 
     providers = []
     issue_body = None
@@ -201,12 +214,15 @@ def create_or_update_issue(repo_name, github_token, env):
         collection_names = get_collection_names(providers, env, all_collections)
         issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
 
-        if len(failed) > 0:
+        if len(failed_test) > 0:
             issue_body += "\n FAILED: \n"
-            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in failed)
+            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in failed_test)
         if len(skipped) > 0:
             issue_body += "\n SKIPPED: \n"
             issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in skipped)
+        if len(no_associations) > 0:
+            issue_body += "\n NO ASSOCIATIONS: \n"
+            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in no_associations)
 
     else:
         issue_body = "There are no failed or skipped collections"
