@@ -14,7 +14,6 @@ import podaac.subsetter.subset
 import pytest
 import requests
 import xarray
-import pandas as pd
 
 from requests.auth import HTTPBasicAuth
 
