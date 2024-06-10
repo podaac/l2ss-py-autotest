@@ -162,7 +162,7 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
     return variables
 
 
-def get_half_extent(start: str, end: str):
+def get_half_temporal_extent(start: str, end: str):
     # Convert the input string dates to datetime objects (account for the 'Z' in the strings)
     start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%S.%fZ')
     end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%S.%fZ')
@@ -371,7 +371,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
     end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
-    temporal_subset = get_half_extent(start_time, end_time)
+    temporal_subset = get_half_temporal_extent(start_time, end_time)
     
     # Build harmony request
     harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
