@@ -39,9 +39,10 @@ jobs:
       env:
         CMR_USER: ${{ secrets.CMR_USER }}
         CMR_PASS: ${{ secrets.CMR_PASS }}
+        ENV: ${{ matrix.environment }}
       run: |
-        poetry run pytest -n 10 verify_collection.py --env ${{ matrix.environment }} --regression --junitxml=$GITHUB_WORKSPACE/test-results/${{ matrix.environment }}_test_report.xml || true
         poetry run python get_associations.py
+        poetry run pytest -n 10 verify_collection.py --env ${{ matrix.environment }} --regression --junitxml=$GITHUB_WORKSPACE/test-results/${{ matrix.environment }}_test_report.xml || true
 
     - name: Run Create Issues Script
       working-directory: tests
