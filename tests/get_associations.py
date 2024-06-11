@@ -45,9 +45,6 @@ def get_associations(token, env):
     if env == "ops":
         mode = cmr.queries.CMR_OPS
 
-    if token:
-        print("THERE IS A TOKEN")
-
     headers = {
         "Authorization": f"Bearer {token}"
     }
