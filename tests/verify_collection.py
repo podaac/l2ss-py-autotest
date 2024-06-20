@@ -40,7 +40,6 @@ def cmr_mode(env):
 
 @pytest.fixture(scope="session")
 def harmony_env(env):
-    # return harmony.config.Environment.LOCAL
     if env == 'uat':
         return harmony.config.Environment.UAT
     else:
