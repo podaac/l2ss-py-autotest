@@ -357,7 +357,6 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
     # Out of options, fail the test because we couldn't determine lat/lon variables
     pytest.fail(f"Unable to find latitude and longitude variables.")
 
-
 @pytest.mark.timeout(600)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token):
@@ -527,7 +526,6 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
     # Submit harmony request and download result
     job_id = harmony_client.submit(harmony_request)
     logging.info("Submitted harmony job %s", job_id)
+
     harmony_client.wait_for_processing(job_id, show_progress=True)
-    assert harmony_client.status == "successful"
-
-
+    assert harmony_client.status(job_id).get('status') == "successful"
