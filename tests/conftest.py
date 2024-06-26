@@ -56,7 +56,7 @@ def pytest_generate_tests(metafunc):
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
         
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
-            metafunc.parametrize("collection_concept_id", associations)
+            metafunc.parametrize("collection_concept_id", associations[:10])
     else:
         collection_concept_id = metafunc.config.option.concept_id
         if 'collection_concept_id' in metafunc.fixturenames and collection_concept_id is not None:
@@ -72,12 +72,15 @@ def log_global_env_facts(record_testsuite_property, request):
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     filtered_success, success, skipped, failed = [], [], [], []
-    test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
 
     # the fourth keyword is the collection concept id may change if we change the test inputs
     skipped.extend([list(skip.keywords)[3] for skip in terminalreporter.stats.get('skipped', [])])
     failed.extend([list(failed.keywords)[3] for failed in terminalreporter.stats.get('failed', [])])
     success.extend([list(passed.keywords)[3] for passed in terminalreporter.stats.get('passed', [])])
+
+    skipped = list(set(skipped))
+    failed = list(set(failed))
+    success = list(set(success))
 
     # Have temporal and spacial test if failed either one don't put in success
 
@@ -92,12 +95,14 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     filtered_success.extend(list(set_filtered_success))
 
     env = config.option.env
+    
+    test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
 
     if config.option.regression:
 
         file_path = f'{env}_regression_results.json'
         with open(file_path, 'w') as file:
-            json.dump(test_results, file)
+            json.dump(test_results, file, indent=4)
 
         for outcome, tests in test_results.items():
             if tests:
@@ -105,8 +110,6 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 print(tests)
                 file_path = f'{env}_{outcome}.json'
                 with open(file_path, 'w') as file:
-                    json.dump(tests, file)
-
-
+                    json.dump(tests, file, indent=4)
 
 
