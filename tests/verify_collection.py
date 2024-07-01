@@ -429,7 +429,6 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
                         subsetted_ds_data = xarray.open_dataset(subsetted_filepath, group=g_data, decode_times=False)
                         sci_var = list(subsetted_ds_data.variables.keys())[0]
                         subsetted_ds_new['science_test'] = subsetted_ds_data[sci_var]
-
                     break
                 # recall the function on a group that has groups in it and didn't find latitude
                 # this is going 'deeper' into the groups
@@ -469,6 +468,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     else:
         # Can't find a science var in UMM-V, just pick one
+
         science_var_name = next(iter([v for v in subsetted_ds_new.variables if
                                     str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
 
