@@ -54,7 +54,7 @@ def pytest_generate_tests(metafunc):
 
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
-
+        
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
             metafunc.parametrize("collection_concept_id", associations)
     else:
@@ -71,13 +71,25 @@ def log_global_env_facts(record_testsuite_property, request):
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
-    success, skipped, failed = [], [], []
-    test_results = {'success': success, 'failed': failed, 'skipped': skipped}
+    filtered_success, success, skipped, failed = [], [], [], []
+    test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
 
     # the fourth keyword is the collection concept id may change if we change the test inputs
     skipped.extend([list(skip.keywords)[3] for skip in terminalreporter.stats.get('skipped', [])])
     failed.extend([list(failed.keywords)[3] for failed in terminalreporter.stats.get('failed', [])])
     success.extend([list(passed.keywords)[3] for passed in terminalreporter.stats.get('passed', [])])
+
+    # Have temporal and spacial test if failed either one don't put in success
+
+    # Convert lists to sets
+    fail_set = set(failed)
+    success_set = set(success)
+
+    # Remove elements from success that are in fail
+    set_filtered_success = success_set - fail_set
+
+    # Convert the set back to a list if needed
+    filtered_success.extend(list(set_filtered_success))
 
     env = config.option.env
 

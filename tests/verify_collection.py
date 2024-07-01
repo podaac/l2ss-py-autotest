@@ -4,6 +4,7 @@ import os
 import pathlib
 import shutil
 from typing import List, Dict
+from datetime import datetime, timedelta
 
 import cf_xarray as cfxr
 import harmony
@@ -159,6 +160,27 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
         variables.extend(json.loads(variables_items[0]).get('items'))
 
     return variables
+
+
+def get_half_temporal_extent(start: str, end: str):
+    # Convert the input string dates to datetime objects (account for the 'Z' in the strings)
+    start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%S.%fZ')
+    end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%S.%fZ')
+    
+    # Calculate the total duration
+    total_duration = end_dt - start_dt
+    
+    # Calculate the half duration
+    half_duration = total_duration / 2
+    
+    # Calculate the quarter duration (half of the half duration)
+    quarter_duration = half_duration / 2
+    
+    # Determine the new start and end times
+    new_start_dt = start_dt + quarter_duration
+    new_end_dt = end_dt - quarter_duration
+    
+    return {"start": new_start_dt, "end": new_end_dt, "stop": new_end_dt}
 
 
 def get_bounding_box(granule_umm_json):
@@ -335,7 +357,6 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
     # Out of options, fail the test because we couldn't determine lat/lon variables
     pytest.fail(f"Unable to find latitude and longitude variables.")
 
-
 @pytest.mark.timeout(600)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token):
@@ -347,13 +368,17 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     north, south, east, west = get_bounding_box(granule_json)
     east, west, north, south = create_smaller_bounding_box(east, west, north, south, .95)
 
+    start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
+    end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
+    
     # Build harmony request
     harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
     request_bbox = harmony.BBox(w=west, s=south, e=east, n=north)
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection, spatial=request_bbox,
                                       granule_id=[granule_json['meta']['concept-id']])
-    logging.info("Sending harmony request %s", harmony_client.request_as_curl(harmony_request))
+
+    logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
 
     # Submit harmony request and download result
     job_id = harmony_client.submit(harmony_request)
@@ -485,3 +510,30 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             logging.info("Partial Lon Success - no Data")
         else:
             assert False
+
+@pytest.mark.timeout(600)
+def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
+                        harmony_env, tmp_path: pathlib.Path, bearer_token):
+    test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
+
+    logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
+
+    start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
+    end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
+    temporal_subset = get_half_temporal_extent(start_time, end_time)
+    
+    # Build harmony request
+    harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
+    request_collection = harmony.Collection(id=collection_concept_id)
+    harmony_request = harmony.Request(collection=request_collection,
+                                      granule_id=[granule_json['meta']['concept-id']],
+                                      temporal=temporal_subset)
+
+    logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
+
+    # Submit harmony request and download result
+    job_id = harmony_client.submit(harmony_request)
+    logging.info("Submitted harmony job %s", job_id)
+
+    harmony_client.wait_for_processing(job_id, show_progress=True)
+    assert harmony_client.status(job_id).get('status') == "successful"
