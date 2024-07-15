@@ -54,7 +54,30 @@ def pytest_generate_tests(metafunc):
 
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
-        
+
+        associations = [
+            "C1261591413-POCLOUD",
+            "C1256524295-POCLOUD",
+            "C1240739726-POCLOUD",
+            "C1242274079-POCLOUD",
+            "C1238621185-POCLOUD",
+            "C1238621176-POCLOUD",
+            "C1240739719-POCLOUD",
+            "C1240739734-POCLOUD",
+            "C1241042620-POCLOUD",
+            "C1242274070-POCLOUD",
+            "C1238658392-POCLOUD",
+            "C1241042621-POCLOUD",
+            "C1259966654-POCLOUD",
+            "C1238621092-POCLOUD",
+            "C1238621178-POCLOUD",
+            "C1238658389-POCLOUD",
+            "C1240739526-POCLOUD",
+            "C1238621186-POCLOUD",
+            "C1238687282-POCLOUD",
+            "C1238621182-POCLOUD",
+        ]
+
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
             metafunc.parametrize("collection_concept_id", associations)
     else:

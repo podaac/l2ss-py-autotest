@@ -230,13 +230,13 @@ def create_or_update_issue(repo_name, github_token, env):
     existing_issue_number = get_existing_issue_number(
         repo_name, issue_title, github_token)
 
-    if existing_issue_number:
-        # Update the existing issue
-        update_issue(repo_name, existing_issue_number,
-                     issue_body, github_token)
-    else:
-        # Create a new issue
-        create_issue(repo_name, issue_title, issue_body, github_token)
+    #if existing_issue_number:
+    #    # Update the existing issue
+    #    update_issue(repo_name, existing_issue_number,
+    #                 issue_body, github_token)
+    #else:
+    #    # Create a new issue
+    #    create_issue(repo_name, issue_title, issue_body, github_token)
 
 
 if __name__ == "__main__":
