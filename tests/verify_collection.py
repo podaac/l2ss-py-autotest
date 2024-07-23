@@ -318,7 +318,7 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
         shutil.copy(file_to_subset, filename)
         nc_dataset = netCDF4.Dataset(filename, mode='r+')
         # flatten the dataset
-        nc_dataset_flattened = podaac.subsetter.group_handling.transform_grouped_dataset(nc_dataset, 'my_copy_file.nc')
+        nc_dataset_flattened = podaac.subsetter.group_handling.transform_grouped_dataset(nc_dataset, filename)
 
         args = {
                 'decode_coords': False,
