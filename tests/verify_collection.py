@@ -358,6 +358,13 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
     # Out of options, fail the test because we couldn't determine lat/lon variables
     pytest.fail(f"Unable to find latitude and longitude variables.")
 
+def find_variable(ds, var_name):
+    try:
+        var_ds = ds[var_name]
+    except KeyError:
+        var_ds = ds.get(var_name.rsplit("/", 1)[-1], None)
+    return var_ds
+
 @pytest.mark.timeout(600)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token):
@@ -445,35 +452,37 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     var_ds = None
     msk = None
 
-    if science_vars := get_science_vars(collection_variables):
-        for idx, value in enumerate(science_vars):
-            science_var_name = science_vars[idx]['umm']['Name']
-            try:
-                var_ds = subsetted_ds_new[science_var_name]
-                msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-                break
-            except Exception:
+    science_vars = get_science_vars(collection_variables)
+    if science_vars:
+        for var in science_vars:
+            science_var_name = var['umm']['Name']
+            var_ds = find_variable(subsetted_ds_new, science_var_name)
+            if var_ds is not None:
                 try:
-                    # if the variable couldn't be found because the name includes a group, e.g.,
-                    # `geolocation/relative_azimuth_angle`,
-                    # then try to access the variable after removing the group name.
-                    var_ds = subsetted_ds_new[science_var_name.rsplit("/", 1)[-1]]
                     msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
                     break
                 except Exception:
-                    var_ds = None
-                    msk = None
-
-        if var_ds is None and msk is None:
-            pytest.fail(f"Unable to find variable from umm-v to use as science variable.")
-
+                    continue
+        else:
+            var_ds, msk = None, None
     else:
-        # Can't find a science var in UMM-V, just pick one
+        for science_var_name in subsetted_ds_new.variables:
+            if (str(science_var_name) not in lat_var_name and 
+                str(science_var_name) not in lon_var_name and 
+                'time' not in str(science_var_name)):
 
-        science_var_name = next(iter([v for v in subsetted_ds_new.variables if
-                                    str(v) not in lat_var_name and str(v) not in lon_var_name and 'time' not in str(v)]))
+                var_ds = find_variable(subsetted_ds_new, science_var_name)
+                if var_ds is not None:
+                    try:
+                        msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
+                        break
+                    except Exception:
+                        continue
+        else:
+            var_ds, msk = None, None
 
-        var_ds = subsetted_ds_new[science_var_name]
+    if var_ds is None or msk is None:
+        pytest.fail("Unable to find variable from umm-v to use as science variable.")
 
     try:
         msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
