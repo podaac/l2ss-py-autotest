@@ -50,7 +50,7 @@ def get_associations(token, env):
     }
 
     service_concept_id = cmr.queries.ServiceQuery(mode=mode).provider('POCLOUD').name('PODAAC L2 Cloud Subsetter').get()[0].get('concept_id')
-    url = cmr.queries.CollectionQuery(mode=mode).service_concept_id(service_concept_id).provider('POCLOUD')._build_url()
+    url = cmr.queries.CollectionQuery(mode=mode).service_concept_id(service_concept_id)._build_url()
     collections_query = requests.get(url, headers=headers, params={'page_size': 2000}).json()['feed']['entry']
     collections = [a.get('id') for a in collections_query]
 
