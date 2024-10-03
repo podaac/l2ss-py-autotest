@@ -69,8 +69,8 @@ def skip_temporal(env):
 
 # Fixture for the second skip list (skip_collections2.csv)
 @pytest.fixture(scope="session")
-def skip_spacial(env):
-    return read_skip_list(f"skip/skip_spacial_{env}.csv")
+def skip_spatial(env):
+    return read_skip_list(f"skip/skip_spatial_{env}.csv")
 
 
 @pytest.fixture(scope="session")
@@ -387,11 +387,11 @@ def find_variable(ds, var_name):
 
 @pytest.mark.timeout(600)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token, skip_spacial):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token, skip_spatial):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
 
-    if collection_concept_id in skip_spacial:
-        pytest.skip(f"Known collection to skip for spacial testing {collection_concept_id}")
+    if collection_concept_id in skip_spatial:
+        pytest.skip(f"Known collection to skip for spatial testing {collection_concept_id}")
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
 

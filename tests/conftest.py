@@ -79,7 +79,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     failed.extend([list(failed.keywords)[3] for failed in terminalreporter.stats.get('failed', [])])
     success.extend([list(passed.keywords)[3] for passed in terminalreporter.stats.get('passed', [])])
 
-    # Have temporal and spacial test if failed either one don't put in success
+    # Have temporal and spatial test if failed either one don't put in success
 
     # Convert lists to sets
     fail_set = set(failed)
