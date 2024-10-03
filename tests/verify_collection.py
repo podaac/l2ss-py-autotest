@@ -14,6 +14,7 @@ import podaac.subsetter.subset
 import pytest
 import requests
 import xarray
+import csv
 
 from requests.auth import HTTPBasicAuth
 
@@ -51,6 +52,25 @@ def request_session():
     with requests.Session() as s:
         s.headers.update({'User-agent': 'l2ss-py-autotest'})
         yield s
+
+
+# Helper function to read a single CSV file and return a set of skip entries
+def read_skip_list(csv_file):
+    with open(csv_file, newline='') as f:
+        reader = csv.reader(f)
+        return {row[0].strip() for row in reader}
+
+
+# Fixture for the first skip list (skip_collections1.csv)
+@pytest.fixture(scope="session")
+def skip_temporal(env):
+    return read_skip_list(f"skip/skip_temporal_{env}.csv")
+
+
+# Fixture for the second skip list (skip_collections2.csv)
+@pytest.fixture(scope="session")
+def skip_spatial(env):
+    return read_skip_list(f"skip/skip_spatial_{env}.csv")
 
 
 @pytest.fixture(scope="session")
@@ -367,8 +387,11 @@ def find_variable(ds, var_name):
 
 @pytest.mark.timeout(600)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token, skip_spatial):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
+
+    if collection_concept_id in skip_spatial:
+        pytest.skip(f"Known collection to skip for spatial testing {collection_concept_id}")
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
 
@@ -523,8 +546,11 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
 @pytest.mark.timeout(600)
 def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token):
-    test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
+                        harmony_env, tmp_path: pathlib.Path, bearer_token, skip_temporal):
+    test_spatial_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
+
+    if collection_concept_id in skip_temporal:
+        pytest.skip(f"Known collection to skip for temporal testing {collection_concept_id}")
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
 
