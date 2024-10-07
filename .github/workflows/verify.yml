@@ -35,16 +35,20 @@ jobs:
         run: |
           echo "test_env=$(python -c "print('${{ github.head_ref }}'.split('/')[1])")" >> $GITHUB_OUTPUT
           echo "concept_id=$(python -c "print('${{ github.head_ref }}'.split('/')[2])")" >> $GITHUB_OUTPUT
+      - name: install
+      - id: install
+        run: |
+          poetry install
       - name: Execute tests
         id: run-tests
+        working-directory: tests
         env:
           TEST_ENV: ${{ steps.get-env-ccid.outputs.test_env }}
           CONCEPT_ID: ${{ steps.get-env-ccid.outputs.concept_id }}
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
-          poetry install
-          poetry run pytest tests/verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
+          poetry run pytest verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
       - name: Publish Test Results
         id: publish-test
         uses: EnricoMi/publish-unit-test-result-action@v2
