@@ -168,7 +168,6 @@ def update_issue(repo_name, issue_number, issue_body, github_token):
 
     print(f"Issue updated successfully: {response.json()['html_url']}")
 
-
 def create_or_update_issue(repo_name, github_token, env):
 
     upper_env = env.upper()
@@ -185,28 +184,31 @@ def create_or_update_issue(repo_name, github_token, env):
 
     failed = results.get('failed', [])
     skipped = results.get('skipped',[])
-    
+
+    failed_concept_ids = [collection.get('concept_id') for collection in failed]
+    skipped_concept_ids =  [collection.get('concept_id') for collection in skipped]
+
     no_associations = []
     failed_test = []
 
-    for collection in failed: 
-        if collection not in current_associations:
-            no_associations.append(collection)
+    for collection_concept_id in failed_concept_ids: 
+        if collection_concept_id not in current_associations:
+            no_associations.append(collection_concept_id)
         else:
-            failed_test.append(collection)
+            failed_test.append(collection_concept_id)
 
     providers = []
     issue_body = None
 
-    all_collections = failed + skipped
+    all_collections = failed_concept_ids + skipped_concept_ids
 
     if len(failed) > 0 or len(skipped) > 0:
 
-        for collection in failed:
+        for collection in failed_concept_ids:
             provider = collection.split('-')[1]
             if provider not in providers:
                 providers.append(provider)
-        for collection in skipped:
+        for collection in skipped_concept_ids:
             provider = collection.split('-')[1]
             if provider not in providers:
                 providers.append(provider)
@@ -214,12 +216,14 @@ def create_or_update_issue(repo_name, github_token, env):
         collection_names = get_collection_names(providers, env, all_collections)
         issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
 
+        print(collection_names)
+
         if len(failed_test) > 0:
             issue_body += "\n FAILED: \n"
-            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in failed_test)
+            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('message')}" for cid in failed)
         if len(skipped) > 0:
             issue_body += "\n SKIPPED: \n"
-            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in skipped)
+            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('message')}" for cid in skipped)
         if len(no_associations) > 0:
             issue_body += "\n NO ASSOCIATIONS: \n"
             issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in no_associations)

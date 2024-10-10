@@ -2,6 +2,7 @@ import os
 import pathlib
 import json
 import pytest
+import re
 
 try:
     os.environ['CMR_USER']
@@ -54,7 +55,7 @@ def pytest_generate_tests(metafunc):
 
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
-        
+
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
             metafunc.parametrize("collection_concept_id", associations)
     else:
@@ -69,27 +70,101 @@ def log_global_env_facts(record_testsuite_property, request):
     record_testsuite_property("env", request.config.getoption('env'))
 
 
+def get_error_message(report):
+
+    # If it's a regular test failure (not a skipped or xfailed test)
+    if hasattr(report, 'longreprtext'):
+        # Extract the short-form failure reason (in pytest >= 6)
+        error_message = report.longreprtext
+    else:
+        # Fallback if longreprtext is not available
+        if isinstance(report.longrepr, tuple):
+            error_message = report.longrepr[2]
+        else:
+            error_message = str(report.longrepr)
+
+    exception_pattern = r"E\s+(\w+):\s+\(([^,]+),\s+'(.+?)'\)"
+    match = re.search(exception_pattern, error_message)
+
+    if match:
+        exception_type = match.group(1)  # 'Exception'
+        exception_reason = match.group(2)  # 'Not Found'
+        exception_message = match.group(3)  # 'Error: EULA ... could not be found.'
+
+        # Combine all into one message
+        full_message = f"Exception Type: {exception_type}, Reason: {exception_reason}, Message: {exception_message}"
+        return full_message
+    else:
+        return "No exception found."
+
+
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     filtered_success, success, skipped, failed = [], [], [], []
+
     test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
 
-    # the fourth keyword is the collection concept id may change if we change the test inputs
-    skipped.extend([list(skip.keywords)[3] for skip in terminalreporter.stats.get('skipped', [])])
-    failed.extend([list(failed.keywords)[3] for failed in terminalreporter.stats.get('failed', [])])
-    success.extend([list(passed.keywords)[3] for passed in terminalreporter.stats.get('passed', [])])
+    failed_tests = terminalreporter.stats.get('failed', [])
+    skipped_tests = terminalreporter.stats.get('skipped', [])
+    success_tests = terminalreporter.stats.get('passed', [])
 
-    # Have temporal and spatial test if failed either one don't put in success
+    if failed_tests:
+        for report in failed_tests:
 
-    # Convert lists to sets
-    fail_set = set(failed)
-    success_set = set(success)
+            concept_id = list(report.keywords)[3]
 
-    # Remove elements from success that are in fail
-    set_filtered_success = success_set - fail_set
+            # Extract the test name and exception message from the report
+            test_name = report.nodeid
+            test_type = None
 
-    # Convert the set back to a list if needed
-    filtered_success.extend(list(set_filtered_success))
+            if "spatial" in test_name:
+                test_type = "spatial"
+            elif "temporal" in test_name:
+                test_type = "temporal"
+
+            full_message = get_error_message(report)
+
+            failed.append({
+                "concept_id": concept_id,
+                "test_type": test_type,
+                "message": full_message
+            })
+
+    if skipped_tests:
+        for report in skipped_tests:
+
+            concept_id = list(report.keywords)[3]
+
+            # Extract the test name and exception message from the report
+            test_name = report.nodeid
+            test_type = None
+
+            if "spatial" in test_name:
+                test_type = "spatial"
+            elif "temporal" in test_name:
+                test_type = "temporal"
+
+            # If it's a regular test failure (not a skipped or xfailed test)
+            if hasattr(report, 'longreprtext'):
+                # Extract the short-form failure reason (in pytest >= 6)
+                error_message = report.longreprtext
+            else:
+                # Fallback if longreprtext is not available
+                if isinstance(report.longrepr, tuple):
+                    error_message = report.longrepr[2]
+                else:
+                    error_message = str(report.longrepr)
+
+            error = "UNKNOWN"
+            if isinstance(report.longreprtext, str):
+                tuple_error = eval(report.longreprtext)
+                error = tuple_error[2]
+
+            skipped.append({
+                "concept_id": concept_id,
+                "test_type": test_type,
+                "message": error
+            })
 
     env = config.option.env
 
@@ -106,7 +181,5 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 file_path = f'{env}_{outcome}.json'
                 with open(file_path, 'w') as file:
                     json.dump(tests, file)
-
-
 
 
