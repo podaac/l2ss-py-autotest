@@ -130,7 +130,7 @@ def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str, r
     if 'items' in response_json and len(response_json['items']) > 0:
         return response_json['items'][0]
     elif cmr_mode == cmr.CMR_UAT:
-        pytest.skip(f"No granules found for UAT collection {collection_concept_id}. CMR search used was {cmr_url}")
+        pytest.fail(f"No granules found for UAT collection {collection_concept_id}. CMR search used was {cmr_url}")
     elif cmr_mode == cmr.CMR_OPS:
         pytest.fail(f"No granules found for OPS collection {collection_concept_id}. CMR search used was {cmr_url}")
 
@@ -155,7 +155,7 @@ def original_granule_localpath(granule_json: dict, tmp_path, bearer_token: str,
     if granule_url:
         return download_file(granule_url)
     else:
-        pytest.skip(f"Unable to find download URL for {granule_json['meta']['concept-id']}")
+        pytest.fail(f"Unable to find download URL for {granule_json['meta']['concept-id']}")
 
 
 @pytest.fixture(scope="function")
@@ -167,8 +167,8 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
     collection_associations = collection_res.get("associations")
     variable_concept_ids = collection_associations.get("variables")
 
-    if variable_concept_ids is None and env == 'uat':
-        pytest.skip('There are no umm-v associated with this collection in UAT')
+    if variable_concept_ids is None:
+        pytest.fail(f'There are no umm-v associated with this collection in {env}')
 
     variables = []
     for i in range(0, len(variable_concept_ids), 40):
