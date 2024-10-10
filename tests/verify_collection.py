@@ -168,7 +168,7 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
     variable_concept_ids = collection_associations.get("variables")
 
     if variable_concept_ids is None:
-        pytest.fail(f'There are no umm-v associated with this collection {env}')
+        pytest.fail(f'There are no umm-v associated with this collection in {env}')
 
     variables = []
     for i in range(0, len(variable_concept_ids), 40):
