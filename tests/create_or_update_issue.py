@@ -174,11 +174,12 @@ def create_or_update_issue(repo_name, github_token, env, test_results):
 
     """
     results_file = f'{env}_regression_results.json'
-    current_associations_file = f'{env}_associations.json'
   
     with open(results_file, 'r') as file:
         results = json.load(file)
     """
+
+    current_associations_file = f'{env}_associations.json'
 
     with open(current_associations_file, 'r') as file:
         current_associations = json.load(file)

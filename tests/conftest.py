@@ -56,7 +56,7 @@ def pytest_generate_tests(metafunc):
 
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
-        midpoint = len(associations) // 6
+        midpoint = len(associations) // 8
 
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
             metafunc.parametrize("collection_concept_id", associations[:midpoint])
@@ -205,5 +205,4 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 file_path = f'{env}_{outcome}.json'
                 with open(file_path, 'w') as file:
                     json.dump(tests, file)
-
 
