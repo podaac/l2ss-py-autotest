@@ -14,8 +14,8 @@ jobs:
     name: Find new associations
     runs-on: ubuntu-latest
     outputs:
-      new_uat_associations: ${{ steps.diff.outputs.new_uat_associations }}
-      new_ops_associations: ${{ steps.diff.outputs.new_ops_associations }}
+      new_uat_associations: ${{ steps.diff_uat.outputs.new_uat_associations }}
+      new_ops_associations: ${{ steps.diff_ops.outputs.new_ops_associations }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,26 +25,28 @@ jobs:
         uses: abatilo/actions-poetry@v3
         with:
           poetry-version: 1.5.1
-      - name: Run diff
-        id: diff
-        env:
-          UAT_TOKEN_TEMP: ${{ secrets.LAUNCHPAD_TOKEN_UAT }}
-          OPS_TOKEN_TEMP: ${{ secrets.LAUNCHPAD_TOKEN_OPS }}
+      -name: Install l2ss-py-autotest
         run: |
           poetry install
-
+      - name: Run diff in UAT
+        id: diff_uat
+        env:
+          UAT_TOKEN_TEMP: ${{ secrets.LAUNCHPAD_TOKEN_UAT }}
+        run: |
           ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
-          ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt
-
           poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt --token $UAT_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
-          poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt --token $OPS_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt
-
           echo "new_uat_associations=$(poetry run python tests/collection_names.py --env uat --token $UAT_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt)" >> $GITHUB_OUTPUT
-          echo "new_ops_associations=$(poetry run python tests/collection_names.py --env ops --token $OPS_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt)" >> $GITHUB_OUTPUT
-
           rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
-          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt
           rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
+      - name: Run diff in OPS
+        id: diff_ops
+        env:
+          OPS_TOKEN_TEMP: ${{ secrets.LAUNCHPAD_TOKEN_OPS }}
+        run: |
+          ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt
+          poetry run cmr_association_diff -e ops -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt --token $OPS_TOKEN_TEMP > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt
+          echo "new_ops_associations=$(poetry run python tests/collection_names.py --env ops --token $OPS_TOKEN_TEMP --file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt)" >> $GITHUB_OUTPUT
+          rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops_associations.txt
           rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_ops_associations.txt
   open_pr_uat:
     needs: find_new
