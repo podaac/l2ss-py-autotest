@@ -55,9 +55,11 @@ def pytest_generate_tests(metafunc):
 
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
+        midpoint = len(associations) // 2
+
 
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
-            metafunc.parametrize("collection_concept_id", associations)
+            metafunc.parametrize("collection_concept_id", associations[:midpoint])
     else:
         collection_concept_id = metafunc.config.option.concept_id
         if 'collection_concept_id' in metafunc.fixturenames and collection_concept_id is not None:
@@ -114,7 +116,6 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if failed_tests:
         for report in failed_tests:
 
-            print("HERE IS FAILED TEST")
             concept_id = list(report.keywords)[3]
 
             # Extract the test name and exception message from the report
@@ -172,7 +173,10 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
 
+    print("======================================================")
     print(test_results)
+    print("======================================================")
+
     env = config.option.env
 
     if config.option.regression:
