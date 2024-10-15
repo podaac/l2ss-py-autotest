@@ -187,10 +187,10 @@ def create_or_update_issue(repo_name, github_token, env, test_results):
     failed = test_results.get('failed', [])
     skipped = test_results.get('skipped',[])
 
-    print("==================UPDATING ISSUE====================")
-    print(failed)
-    print(skipped)
-    print("==================UPDATING ISSUE====================")
+    print("==================UPDATING ISSUE====================", flush=True)
+    print(failed, flush=True)
+    print(skipped, flush=True)
+    print("==================UPDATING ISSUE====================", flush=True)
 
     failed_concept_ids = [collection.get('concept_id') for collection in failed]
     skipped_concept_ids =  [collection.get('concept_id') for collection in skipped]

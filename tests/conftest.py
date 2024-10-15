@@ -115,6 +115,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if failed_tests:
         for report in failed_tests:
 
+            print("PROCESSING TEST")
             concept_id = list(report.keywords)[3]
 
             # Extract the test name and exception message from the report
@@ -133,6 +134,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 "test_type": test_type,
                 "message": full_message
             })
+
+    print("DONE PROCESSING FAILED")
 
     if skipped_tests:
         for report in skipped_tests:
@@ -169,10 +172,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 "test_type": test_type,
                 "message": error
             })
+    print("AFTER SKIPPED", flush=True)
 
-    print("======================================================")
-    print(failed)
-    print("======================================================")
+    print("======================================================", flush=True)
+    print(failed, flush=True)
+    print("======================================================", flush=True)
 
     test_results = {
         'success': filtered_success,
@@ -185,9 +189,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     env = os.getenv("ENV")
     create_or_update_issue.create_or_update_issue(repo_name, github_token, env, test_results)
 
-    print("======================================================")
-    print(test_results)
-    print("======================================================")
+    print("======================================================", flush=True)
+    print(test_results, flush=True)
+    print("======================================================", flush=True)
 
     env = config.option.env
 
