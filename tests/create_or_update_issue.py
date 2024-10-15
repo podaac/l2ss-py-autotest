@@ -86,7 +86,6 @@ def get_collection_names(providers, env, collections_list):
 
                 # Make the GraphQL request with headers
                 response = requests.post(url, headers=headers, json=payload)
-                print(response)
                 # Check the status code
                 if response.status_code == 200:
                     # Parse the JSON response

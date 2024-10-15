@@ -108,9 +108,15 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     skipped_tests = terminalreporter.stats.get('skipped', [])
     success_tests = terminalreporter.stats.get('passed', [])
 
+    print("======================================================")
+    print(failed_tests)
+    print(len(failed_tests))
+    print("======================================================")
+
     if failed_tests:
         for report in failed_tests:
 
+            print("HERE IS FAILED TEST")
             concept_id = list(report.keywords)[3]
 
             # Extract the test name and exception message from the report
