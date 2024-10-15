@@ -171,7 +171,15 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 "message": error
             })
 
-    test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
+    print("======================================================")
+    print(failed)
+    print("======================================================")
+
+    test_results = {
+        'success': filtered_success,
+        'failed': failed, 
+        'skipped': skipped
+    }
 
     repo_name = os.getenv("GITHUB_REPOSITORY")
     github_token = os.getenv("GITHUB_TOKEN")

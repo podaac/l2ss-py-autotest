@@ -178,16 +178,18 @@ def create_or_update_issue(repo_name, github_token, env, test_results):
   
     with open(results_file, 'r') as file:
         results = json.load(file)
+    """
 
     with open(current_associations_file, 'r') as file:
         current_associations = json.load(file)
-    """
-
+    
     failed = test_results.get('failed', [])
     skipped = test_results.get('skipped',[])
 
+    print("==================UPDATING ISSUE====================")
     print(failed)
     print(skipped)
+    print("==================UPDATING ISSUE====================")
 
     failed_concept_ids = [collection.get('concept_id') for collection in failed]
     skipped_concept_ids =  [collection.get('concept_id') for collection in skipped]
