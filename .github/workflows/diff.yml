@@ -1,9 +1,7 @@
-# Run every third day starting from the 2n d of the month 1 am pacific
-# check
-for new collection associations to the l2ss - py UMM - S record
-# in UAT and OPS.If a new association is found, a PR is opened to add the new collection concept id to the
-# cmr / l2ss - py
-/*_associations.txt file.
+# Run every third day starting from the 2nd of the month 1 am pacific 
+# check for new collection associations to the l2ss-py UMM-S record
+# in UAT and OPS. If a new association is found, a PR is opened to add the new collection concept id to the
+# cmr/l2ss-py/*_associations.txt file.
 
 name: Scan For New Associations
 on:
