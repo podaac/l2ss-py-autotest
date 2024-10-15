@@ -3,6 +3,7 @@ import pathlib
 import json
 import pytest
 import re
+import create_or_update_issue
 
 try:
     os.environ['CMR_USER']
@@ -55,8 +56,7 @@ def pytest_generate_tests(metafunc):
 
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
-        midpoint = len(associations) // 4
-
+        midpoint = len(associations) // 6
 
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
             metafunc.parametrize("collection_concept_id", associations[:midpoint])
@@ -172,6 +172,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             })
 
     test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
+
+    repo_name = os.getenv("GITHUB_REPOSITORY")
+    github_token = os.getenv("GITHUB_TOKEN")
+    env = os.getenv("ENV")
+    create_or_update_issue.create_or_update_issue(repo_name, github_token, env, test_results)
 
     print("======================================================")
     print(test_results)

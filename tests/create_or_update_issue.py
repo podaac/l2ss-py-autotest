@@ -167,11 +167,12 @@ def update_issue(repo_name, issue_number, issue_body, github_token):
 
     print(f"Issue updated successfully: {response.json()['html_url']}")
 
-def create_or_update_issue(repo_name, github_token, env):
+def create_or_update_issue(repo_name, github_token, env, test_results):
 
     upper_env = env.upper()
     issue_title = f"Regression test for {upper_env} ISSUES"
 
+    """
     results_file = f'{env}_regression_results.json'
     current_associations_file = f'{env}_associations.json'
   
@@ -180,9 +181,10 @@ def create_or_update_issue(repo_name, github_token, env):
 
     with open(current_associations_file, 'r') as file:
         current_associations = json.load(file)
+    """
 
-    failed = results.get('failed', [])
-    skipped = results.get('skipped',[])
+    failed = test_results.get('failed', [])
+    skipped = test_results.get('skipped',[])
 
     print(failed)
     print(skipped)

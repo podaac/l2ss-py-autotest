@@ -40,19 +40,21 @@ jobs:
         CMR_USER: ${{ secrets.CMR_USER }}
         CMR_PASS: ${{ secrets.CMR_PASS }}
         ENV: ${{ matrix.environment }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}        
       run: |
         poetry run python get_associations.py
         poetry run pytest -n 10 -s verify_collection.py --env ${{ matrix.environment }} --regression --junitxml=$GITHUB_WORKSPACE/test-results/${{ matrix.environment }}_test_report.xml || true
 
-    - name: Run Create Issues Script
-      working-directory: tests
-      env:
-        GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        ENV: ${{ matrix.environment }}
-        CMR_USER: ${{ secrets.CMR_USER }}
-        CMR_PASS: ${{ secrets.CMR_PASS }}
-      run: poetry run python create_or_update_issue.py
+    #- name: Run Create Issues Script
+    #  working-directory: tests
+    #  env:
+    #    GITHUB_REPOSITORY: ${{ github.repository }}
+    #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #    ENV: ${{ matrix.environment }}
+    #    CMR_USER: ${{ secrets.CMR_USER }}
+    #    CMR_PASS: ${{ secrets.CMR_PASS }}
+    #  run: poetry run python create_or_update_issue.py
 
     - name: Publish Test Results
       id: publish-test
