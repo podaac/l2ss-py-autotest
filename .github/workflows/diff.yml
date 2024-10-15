@@ -25,7 +25,7 @@ jobs:
         uses: abatilo/actions-poetry@v3
         with:
           poetry-version: 1.5.1
-      -name: Install l2ss-py-autotest
+      - name: Install l2ss-py-autotest
         run: |
           poetry install
       - name: Run diff in UAT
