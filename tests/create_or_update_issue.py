@@ -184,6 +184,9 @@ def create_or_update_issue(repo_name, github_token, env):
     failed = results.get('failed', [])
     skipped = results.get('skipped',[])
 
+    print(failed)
+    print(skipped)
+
     failed_concept_ids = [collection.get('concept_id') for collection in failed]
     skipped_concept_ids =  [collection.get('concept_id') for collection in skipped]
 

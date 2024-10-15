@@ -102,8 +102,6 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     filtered_success, success, skipped, failed = [], [], [], []
 
-    test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
-
     failed_tests = terminalreporter.stats.get('failed', [])
     skipped_tests = terminalreporter.stats.get('skipped', [])
     success_tests = terminalreporter.stats.get('passed', [])
@@ -172,6 +170,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 "message": error
             })
 
+    test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
+
+    print(test_results)
     env = config.option.env
 
     if config.option.regression:
