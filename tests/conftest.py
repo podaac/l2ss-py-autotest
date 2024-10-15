@@ -137,6 +137,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     print("DONE PROCESSING FAILED")
 
+    """
     if skipped_tests:
         for report in skipped_tests:
 
@@ -172,6 +173,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 "test_type": test_type,
                 "message": error
             })
+
+    """
     print("AFTER SKIPPED", flush=True)
 
     print("======================================================", flush=True)
