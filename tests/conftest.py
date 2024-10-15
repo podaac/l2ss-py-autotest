@@ -55,7 +55,7 @@ def pytest_generate_tests(metafunc):
 
         association_dir = 'uat' if metafunc.config.option.env == 'uat' else 'ops'
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
-        midpoint = len(associations) // 2
+        midpoint = len(associations) // 4
 
 
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
