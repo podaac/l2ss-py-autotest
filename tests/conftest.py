@@ -4,6 +4,7 @@ import json
 import pytest
 import re
 import create_or_update_issue
+from groq import Groq
 
 try:
     os.environ['CMR_USER']
@@ -71,7 +72,7 @@ def log_global_env_facts(record_testsuite_property, request):
     record_testsuite_property("env", request.config.getoption('env'))
 
 
-def get_error_message(report):
+def get_error_message(report, groq_api_key):
 
     # If it's a regular test failure (not a skipped or xfailed test)
     if hasattr(report, 'longreprtext'):
@@ -84,7 +85,29 @@ def get_error_message(report):
         else:
             error_message = str(report.longrepr)
 
-    exception_pattern = r"E\s+(\w+):\s+\(([^,]+),\s+'(.+?)'\)"
+    content = f"summarize error message in 10 words {error_message}"
+
+    client = Groq(
+        api_key=groq_api_key,
+    )
+
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "user",
+                "content": content
+            }
+        ],
+        model="llama-3.2-3b-preview",
+        temperature=0
+    )
+
+    result = chat_completion.choices[0].message.content
+    return result
+
+    
+    #exception_pattern = r"E\s+(\w+):\s+\(([^,]+),\s+'(.+?)'\)"
+    """
     match = re.search(exception_pattern, error_message)
 
     if match:
@@ -96,8 +119,8 @@ def get_error_message(report):
         full_message = f"Exception Type: {exception_type}, Reason: {exception_reason}, Message: {exception_message}"
         return full_message
     else:
-        return "No exception found."
-
+        return report.longreprtext.splitlines()[-1]
+    """
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
@@ -107,10 +130,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     skipped_tests = terminalreporter.stats.get('skipped', [])
     success_tests = terminalreporter.stats.get('passed', [])
 
-    print("======================================================")
-    print(failed_tests)
-    print(len(failed_tests))
-    print("======================================================")
+    groq_api_key = os.getenv("GROQ_API_KEY")
 
     if failed_tests:
         for report in failed_tests:
@@ -127,7 +147,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             elif "temporal" in test_name:
                 test_type = "temporal"
 
-            full_message = get_error_message(report)
+            full_message = get_error_message(report, groq_api_key)
 
             failed.append({
                 "concept_id": concept_id,
@@ -135,66 +155,15 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 "message": full_message
             })
 
-    print("DONE PROCESSING FAILED")
-
-    """
-    if skipped_tests:
-        for report in skipped_tests:
-
-            concept_id = list(report.keywords)[3]
-
-            # Extract the test name and exception message from the report
-            test_name = report.nodeid
-            test_type = None
-
-            if "spatial" in test_name:
-                test_type = "spatial"
-            elif "temporal" in test_name:
-                test_type = "temporal"
-
-            # If it's a regular test failure (not a skipped or xfailed test)
-            if hasattr(report, 'longreprtext'):
-                # Extract the short-form failure reason (in pytest >= 6)
-                error_message = report.longreprtext
-            else:
-                # Fallback if longreprtext is not available
-                if isinstance(report.longrepr, tuple):
-                    error_message = report.longrepr[2]
-                else:
-                    error_message = str(report.longrepr)
-
-            error = "UNKNOWN"
-            if isinstance(report.longreprtext, str):
-                tuple_error = eval(report.longreprtext)
-                error = tuple_error[2]
-
-            skipped.append({
-                "concept_id": concept_id,
-                "test_type": test_type,
-                "message": error
-            })
-
-    """
-    print("AFTER SKIPPED", flush=True)
-
-    print("======================================================", flush=True)
-    print(failed, flush=True)
-    print("======================================================", flush=True)
-
     test_results = {
-        'success': filtered_success,
         'failed': failed, 
-        'skipped': skipped
     }
 
     repo_name = os.getenv("GITHUB_REPOSITORY")
     github_token = os.getenv("GITHUB_TOKEN")
     env = os.getenv("ENV")
-    create_or_update_issue.create_or_update_issue(repo_name, github_token, env, test_results)
-
-    print("======================================================", flush=True)
-    print(test_results, flush=True)
-    print("======================================================", flush=True)
+    if repo_name and github_token:
+        create_or_update_issue.create_or_update_issue(repo_name, github_token, env, test_results)
 
     env = config.option.env
 
