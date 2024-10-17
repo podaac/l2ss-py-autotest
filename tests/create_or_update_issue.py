@@ -252,7 +252,7 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
                 error_message = "Unable to retrieve an error message"
             item['error_message'] = error_message
 
-            time.sleep(20)
+            time.sleep(10)
 
         collection_names = get_collection_names(providers, env, all_collections)
         issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
