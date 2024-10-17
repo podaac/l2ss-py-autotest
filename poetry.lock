@@ -572,13 +572,13 @@ tests = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
 name = "dask"
-version = "2024.9.1"
+version = "2024.10.0"
 description = "Parallel PyData with Task Scheduling"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "dask-2024.9.1-py3-none-any.whl", hash = "sha256:3757bb6c976f0436fef6bd6ad32f8983ee5ce7d8a738a1f643e208cd390ec794"},
-    {file = "dask-2024.9.1.tar.gz", hash = "sha256:06eccc6a68d2882bcd9de24548fa96e8d0da7fbfff0baed3f3c2a526b73dfbb4"},
+    {file = "dask-2024.10.0-py3-none-any.whl", hash = "sha256:1ddc27c7967e134b4f8296a488521485a5ac4927cc63e2abfa0b24227b93217f"},
+    {file = "dask-2024.10.0.tar.gz", hash = "sha256:dfd3efec5d8d8340fb647d0347637133030cad261b714623cc27de286e9db037"},
 ]
 
 [package.dependencies]
@@ -586,7 +586,7 @@ bokeh = {version = ">=3.1.0", optional = true, markers = "extra == \"diagnostics
 click = ">=8.1"
 cloudpickle = ">=3.0.0"
 dask-expr = {version = ">=1.1,<1.2", optional = true, markers = "extra == \"dataframe\""}
-distributed = {version = "2024.9.1", optional = true, markers = "extra == \"distributed\""}
+distributed = {version = "2024.10.0", optional = true, markers = "extra == \"distributed\""}
 fsspec = ">=2021.09.0"
 importlib-metadata = {version = ">=4.13.0", markers = "python_version < \"3.12\""}
 jinja2 = {version = ">=2.10.3", optional = true, markers = "extra == \"diagnostics\""}
@@ -604,27 +604,27 @@ array = ["numpy (>=1.24)"]
 complete = ["dask[array,dataframe,diagnostics,distributed]", "lz4 (>=4.3.2)", "pyarrow (>=14.0.1)"]
 dataframe = ["dask-expr (>=1.1,<1.2)", "dask[array]", "pandas (>=2.0)"]
 diagnostics = ["bokeh (>=3.1.0)", "jinja2 (>=2.10.3)"]
-distributed = ["distributed (==2024.9.1)"]
+distributed = ["distributed (==2024.10.0)"]
 test = ["pandas[test]", "pre-commit", "pytest", "pytest-cov", "pytest-rerunfailures", "pytest-timeout", "pytest-xdist"]
 
 [[package]]
 name = "dask-expr"
-version = "1.1.15"
+version = "1.1.16"
 description = "High Level Expressions for Dask"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "dask_expr-1.1.15-py3-none-any.whl", hash = "sha256:0712e8a3a2a31947fc8e37152d8654aaa303382ec0c61a8d0fc93b0349f772f9"},
-    {file = "dask_expr-1.1.15.tar.gz", hash = "sha256:d12fd1b6cd49aa9d5b1e187b243117eb58b1f9dda555b26a3bd31be10a27e236"},
+    {file = "dask_expr-1.1.16-py3-none-any.whl", hash = "sha256:dec098f940eca939700edf93fc0cdb0e820dcd6ba9780b0036fd965ebc7e813c"},
+    {file = "dask_expr-1.1.16.tar.gz", hash = "sha256:9dd26886f270f373380b38dd2d41ce4321b2724e0814ea5043272cebf7f1b6bb"},
 ]
 
 [package.dependencies]
-dask = "2024.9.1"
+dask = "2024.10.0"
 pandas = ">=2"
 pyarrow = ">=14.0.1"
 
 [package.extras]
-analyze = ["crick", "distributed"]
+analyze = ["crick", "distributed", "graphviz"]
 
 [[package]]
 name = "deprecated"
@@ -645,19 +645,19 @@ dev = ["PyTest", "PyTest-Cov", "bump2version (<1)", "sphinx (<2)", "tox"]
 
 [[package]]
 name = "distributed"
-version = "2024.9.1"
+version = "2024.10.0"
 description = "Distributed scheduler for Dask"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "distributed-2024.9.1-py3-none-any.whl", hash = "sha256:f7acca78afcc50eb337fd46247a33efa5a1696b937083a12556ba33f11be1c74"},
-    {file = "distributed-2024.9.1.tar.gz", hash = "sha256:4d573d89ff4fdde0dd96ad5cfdb843ce8ecef8caf002435bc60d14414dc1e819"},
+    {file = "distributed-2024.10.0-py3-none-any.whl", hash = "sha256:b97b227f1edb5d5c7b8784786debdf624870118d3a91b57cdcea3a77e8136a1a"},
+    {file = "distributed-2024.10.0.tar.gz", hash = "sha256:d08e7fd7acdecf0f058edf35f28889fc43412031d7601a5df69f108a37a8ffc1"},
 ]
 
 [package.dependencies]
 click = ">=8.0"
 cloudpickle = ">=3.0.0"
-dask = "2024.9.1"
+dask = "2024.10.0"
 jinja2 = ">=2.10.3"
 locket = ">=1.0.0"
 msgpack = ">=1.0.2"
@@ -2424,6 +2424,16 @@ files = [
 ]
 
 [[package]]
+name = "ratelimit"
+version = "2.2.1"
+description = "API rate limit decorator"
+optional = false
+python-versions = "*"
+files = [
+    {file = "ratelimit-2.2.1.tar.gz", hash = "sha256:af8a9b64b821529aca09ebaf6d8d279100d766f19e90b5059ac6a718ca6dee42"},
+]
+
+[[package]]
 name = "requests"
 version = "2.32.3"
 description = "Python HTTP for Humans."
@@ -2788,4 +2798,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "d5398f21d863c5b90c01116a2bebc462de8565c5590bdb359727eef625a2ec20"
+content-hash = "41bf212e9ea66fd1a4bae5acf01e019e15274f436cd64c43e1f51eb2ed974d83"

@@ -5,6 +5,7 @@ import pytest
 import re
 import create_or_update_issue
 from groq import Groq
+from ratelimit import limits, sleep_and_retry
 
 try:
     os.environ['CMR_USER']
@@ -72,6 +73,8 @@ def log_global_env_facts(record_testsuite_property, request):
     record_testsuite_property("env", request.config.getoption('env'))
 
 
+@sleep_and_retry
+@limits(calls=5, period=60)  # 60 seconds = 1 minute
 def get_error_message(report, groq_api_key):
 
     # If it's a regular test failure (not a skipped or xfailed test)
@@ -85,7 +88,7 @@ def get_error_message(report, groq_api_key):
         else:
             error_message = str(report.longrepr)
 
-    content = f"summarize error message in 10 words {error_message}"
+    content = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
 
     client = Groq(
         api_key=groq_api_key,
@@ -98,7 +101,7 @@ def get_error_message(report, groq_api_key):
                 "content": content
             }
         ],
-        model="llama-3.2-3b-preview",
+        model="llama-3.1-8b-instant",
         temperature=0
     )
 
