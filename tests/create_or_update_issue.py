@@ -191,7 +191,7 @@ def summarize_error(client, error_message):
 def create_or_update_issue(repo_name, github_token, env, groq_api_key):
 
     client = Groq(
-        api_key=api_key,
+        api_key=groq_api_key,
     )
 
     upper_env = env.upper()
