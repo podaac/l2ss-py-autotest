@@ -172,9 +172,9 @@ def update_issue(repo_name, issue_number, issue_body, github_token):
 def summarize_error(client, error_message):
 
     prompt_criteria = [
-        "summarize the following error message in 10 words",
-        "do not include summary in the response",
-        "include eula if in error message",
+        "Summarize the following error message in 10 words",
+        "Do not include summary in the response",
+        "if eula is in the error include the eula message part in the response if not then don't mention it at all and the uuid for eula",
     ]
 
     prompt_criteria.append(error_message)
