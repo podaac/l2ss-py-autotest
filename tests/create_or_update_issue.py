@@ -246,7 +246,10 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
 
         for item in failed:
             message = item.get('message')
-            error_message = summarize_error(client, message)
+            try:
+                error_message = summarize_error(client, message)
+            except Exception:
+                error_message = "Unable to retrieve an error message"
             item['error_message'] = error_message
 
             time.sleep(20)

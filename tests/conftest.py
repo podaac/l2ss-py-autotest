@@ -93,9 +93,12 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     failed = []
     failed_tests = terminalreporter.stats.get('failed', [])
+    error_tests = terminalreporter.stats.get('error', [])
 
-    if failed_tests:
-        for report in failed_tests:
+    all_failed_test = failed_tests + error_tests
+
+    if all_failed_test:
+        for report in all_failed_test:
 
             concept_id = list(report.keywords)[3]
 
