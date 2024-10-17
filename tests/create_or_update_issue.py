@@ -242,8 +242,6 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
         collection_names = get_collection_names(providers, env, all_collections)
         issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
 
-        print(collection_names)
-
         if len(failed_test) > 0:
             issue_body += "\n FAILED: \n"
             issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('error_message')}" for cid in failed)

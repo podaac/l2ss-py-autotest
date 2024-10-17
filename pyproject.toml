@@ -9,14 +9,14 @@ packages = [{include = "l2ss_py_autotest"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-python-cmr = "^0.11.0"
-harmony-py = "^0.4.14"
+python-cmr = "^0.13.0"
+harmony-py = "^0.4.15"
 matplotlib = "^3.7.2"
 netCDF4 = "^1.6.4"
-xarray = "^2024.5.0"
+xarray = "^2024.9.0"
 cf-xarray = "^0.9.1"
-l2ss-py = "^2.4.0"
-pygithub = "^2.2.0"
+l2ss-py = "^2.11.0"
+pygithub = "^2.4.0"
 pytest-xdist = "^3.6.1"
 groq = "^0.11.0"
 
