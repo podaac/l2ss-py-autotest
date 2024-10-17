@@ -125,7 +125,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     env = config.option.env
 
-    if config.option.regression or True:
+    if config.option.regression:
 
         file_path = f'{env}_regression_results.json'
         with open(file_path, 'w') as file:
