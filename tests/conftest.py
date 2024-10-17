@@ -6,6 +6,7 @@ import re
 import create_or_update_issue
 from groq import Groq
 from ratelimit import limits, sleep_and_retry
+import time
 
 try:
     os.environ['CMR_USER']
@@ -101,13 +102,12 @@ def get_error_message(report, groq_api_key):
                 "content": content
             }
         ],
-        model="llama-3.1-8b-instant",
+        model="llama-3.2-3b-preview",
         temperature=0
     )
 
     result = chat_completion.choices[0].message.content
     return result
-
     
     #exception_pattern = r"E\s+(\w+):\s+\(([^,]+),\s+'(.+?)'\)"
     """
@@ -138,7 +138,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if failed_tests:
         for report in failed_tests:
 
-            print("PROCESSING TEST")
+            time.sleep(20)
             concept_id = list(report.keywords)[3]
 
             # Extract the test name and exception message from the report
@@ -150,7 +150,10 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             elif "temporal" in test_name:
                 test_type = "temporal"
 
-            full_message = get_error_message(report, groq_api_key)
+            try:
+                full_message = get_error_message(report, groq_api_key)
+            except Exception:
+                full_message = "Unable to retrive error message"
 
             failed.append({
                 "concept_id": concept_id,
