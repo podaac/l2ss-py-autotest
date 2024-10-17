@@ -189,6 +189,7 @@ def create_or_update_issue(repo_name, github_token, env, test_results):
         else:
             failed_test.append(collection_concept_id)
 
+    unique_no_associations = list(set(no_associations))
     providers = []
     issue_body = None
 
@@ -209,9 +210,9 @@ def create_or_update_issue(repo_name, github_token, env, test_results):
         if len(failed_test) > 0:
             issue_body += "\n FAILED: \n"
             issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('message')}" for cid in failed)
-        if len(no_associations) > 0:
+        if len(unique_no_associations) > 0:
             issue_body += "\n NO ASSOCIATIONS: \n"
-            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in no_associations)
+            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in unique_no_associations)
 
     else:
         issue_body = "There are no failed or skipped collections"
