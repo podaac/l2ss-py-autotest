@@ -171,13 +171,25 @@ def update_issue(repo_name, issue_number, issue_body, github_token):
 
 def summarize_error(client, error_message):
 
-    content = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
+    prompt_criteria = [
+        "summarize the following error message in 10 words",
+        "do not include summary in the response",
+        "include eula if in error message",
+    ]
+
+    prompt_criteria.append(error_message)
+
+    # Aggregate all the criteria into one detailed prompt
+    aggregated_prompt = (
+        "Create a response following these guidelines: "
+        f"{'; '.join(prompt_criteria)}."
+    )
 
     chat_completion = client.chat.completions.create(
         messages=[
             {
                 "role": "user",
-                "content": content
+                "content": aggregated_prompt
             }
         ],
         model="llama-3.2-3b-preview",
