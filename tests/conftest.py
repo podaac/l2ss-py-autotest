@@ -5,7 +5,6 @@ import pytest
 import re
 import create_or_update_issue
 from groq import Groq
-from ratelimit import limits, sleep_and_retry
 import time
 
 try:
@@ -74,9 +73,7 @@ def log_global_env_facts(record_testsuite_property, request):
     record_testsuite_property("env", request.config.getoption('env'))
 
 
-@sleep_and_retry
-@limits(calls=5, period=60)  # 60 seconds = 1 minute
-def get_error_message(report, groq_api_key):
+def get_error_message(report):
 
     # If it's a regular test failure (not a skipped or xfailed test)
     if hasattr(report, 'longreprtext'):
@@ -89,56 +86,17 @@ def get_error_message(report, groq_api_key):
         else:
             error_message = str(report.longrepr)
 
-    content = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
+    return error_message
 
-    client = Groq(
-        api_key=groq_api_key,
-    )
-
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": content
-            }
-        ],
-        model="llama-3.2-3b-preview",
-        temperature=0
-    )
-
-    result = chat_completion.choices[0].message.content
-    return result
-    
-    #exception_pattern = r"E\s+(\w+):\s+\(([^,]+),\s+'(.+?)'\)"
-    """
-    match = re.search(exception_pattern, error_message)
-
-    if match:
-        exception_type = match.group(1)  # 'Exception'
-        exception_reason = match.group(2)  # 'Not Found'
-        exception_message = match.group(3)  # 'Error: EULA ... could not be found.'
-
-        # Combine all into one message
-        full_message = f"Exception Type: {exception_type}, Reason: {exception_reason}, Message: {exception_message}"
-        return full_message
-    else:
-        return report.longreprtext.splitlines()[-1]
-    """
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
-    filtered_success, success, skipped, failed = [], [], [], []
-
+    failed = []
     failed_tests = terminalreporter.stats.get('failed', [])
-    skipped_tests = terminalreporter.stats.get('skipped', [])
-    success_tests = terminalreporter.stats.get('passed', [])
-
-    groq_api_key = os.getenv("GROQ_API_KEY")
 
     if failed_tests:
         for report in failed_tests:
 
-            time.sleep(20)
             concept_id = list(report.keywords)[3]
 
             # Extract the test name and exception message from the report
@@ -151,7 +109,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 test_type = "temporal"
 
             try:
-                full_message = get_error_message(report, groq_api_key)
+                full_message = get_error_message(report)
             except Exception:
                 full_message = "Unable to retrive error message"
 
@@ -165,15 +123,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         'failed': failed, 
     }
 
-    repo_name = os.getenv("GITHUB_REPOSITORY")
-    github_token = os.getenv("GITHUB_TOKEN")
-    env = os.getenv("ENV")
-    if repo_name and github_token:
-        create_or_update_issue.create_or_update_issue(repo_name, github_token, env, test_results)
-
     env = config.option.env
 
-    if config.option.regression:
+    if config.option.regression or True:
 
         file_path = f'{env}_regression_results.json'
         with open(file_path, 'w') as file:

@@ -2424,16 +2424,6 @@ files = [
 ]
 
 [[package]]
-name = "ratelimit"
-version = "2.2.1"
-description = "API rate limit decorator"
-optional = false
-python-versions = "*"
-files = [
-    {file = "ratelimit-2.2.1.tar.gz", hash = "sha256:af8a9b64b821529aca09ebaf6d8d279100d766f19e90b5059ac6a718ca6dee42"},
-]
-
-[[package]]
 name = "requests"
 version = "2.32.3"
 description = "Python HTTP for Humans."
@@ -2798,4 +2788,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "41bf212e9ea66fd1a4bae5acf01e019e15274f436cd64c43e1f51eb2ed974d83"
+content-hash = "d5398f21d863c5b90c01116a2bebc462de8565c5590bdb359727eef625a2ec20"

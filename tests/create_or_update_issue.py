@@ -2,6 +2,8 @@ import os
 import requests
 import json
 from datetime import datetime
+from groq import Groq
+import time
 
 def bearer_token(env):
     tokens = []
@@ -167,10 +169,38 @@ def update_issue(repo_name, issue_number, issue_body, github_token):
 
     print(f"Issue updated successfully: {response.json()['html_url']}")
 
-def create_or_update_issue(repo_name, github_token, env, test_results):
+def summarize_error(client, error_message):
+
+    content = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
+
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "user",
+                "content": content
+            }
+        ],
+        model="llama-3.2-3b-preview",
+        temperature=0
+    )
+
+    result = chat_completion.choices[0].message.content
+    return result
+
+
+def create_or_update_issue(repo_name, github_token, env, groq_api_key):
+
+    client = Groq(
+        api_key=api_key,
+    )
 
     upper_env = env.upper()
     issue_title = f"Regression test for {upper_env} ISSUES"
+
+    results_file = f'{env}_regression_results.json'
+  
+    with open(results_file, 'r') as file:
+        test_results = json.load(file)
 
     current_associations_file = f'{env}_associations.json'
 
@@ -202,6 +232,13 @@ def create_or_update_issue(repo_name, github_token, env, test_results):
             if provider not in providers:
                 providers.append(provider)
 
+        for item in failed:
+            message = item.get('message')
+            error_message = summarize_error(client, message)
+            item['error_message'] = error_message
+
+            time.sleep(20)
+
         collection_names = get_collection_names(providers, env, all_collections)
         issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
 
@@ -209,13 +246,13 @@ def create_or_update_issue(repo_name, github_token, env, test_results):
 
         if len(failed_test) > 0:
             issue_body += "\n FAILED: \n"
-            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('message')}" for cid in failed)
+            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('error_message')}" for cid in failed)
         if len(unique_no_associations) > 0:
             issue_body += "\n NO ASSOCIATIONS: \n"
             issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in unique_no_associations)
 
     else:
-        issue_body = "There are no failed or skipped collections"
+        issue_body = "There are no failed collections"
 
     existing_issue_number = get_existing_issue_number(
         repo_name, issue_title, github_token)
@@ -228,12 +265,12 @@ def create_or_update_issue(repo_name, github_token, env, test_results):
         # Create a new issue
         create_issue(repo_name, issue_title, issue_body, github_token)
 
-
 if __name__ == "__main__":
     # Get repository and token from environment variables
     repo_name = os.getenv("GITHUB_REPOSITORY")
     github_token = os.getenv("GITHUB_TOKEN")
     env = os.getenv("ENV")
+    groq_api_key = os.getenv("GROQ_API_KEY")
 
     # Call the create_or_update_issue function with repository and token
-    create_or_update_issue(repo_name, github_token, env)
+    create_or_update_issue(repo_name, github_token, env, groq_api_key)
