@@ -185,11 +185,13 @@ def summarize_error(client, error_message):
         f"{'; '.join(prompt_criteria)}."
     )
 
+    content = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
+
     chat_completion = client.chat.completions.create(
         messages=[
             {
                 "role": "user",
-                "content": aggregated_prompt
+                "content": content
             }
         ],
         model="llama-3.2-3b-preview",

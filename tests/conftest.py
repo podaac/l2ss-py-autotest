@@ -6,6 +6,7 @@ import re
 import create_or_update_issue
 from groq import Groq
 import time
+import re
 
 try:
     os.environ['CMR_USER']
@@ -86,7 +87,10 @@ def get_error_message(report):
         else:
             error_message = str(report.longrepr)
 
-    return error_message
+    pattern = r"bearer_token = '.*?'"
+    cleaned_text = re.sub(pattern, "", error_message)
+    
+    return cleaned_text
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
@@ -116,6 +120,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             except Exception:
                 full_message = "Unable to retrive error message"
 
+            print(type(full_message))
+            print(full_message)
+
             failed.append({
                 "concept_id": concept_id,
                 "test_type": test_type,
@@ -128,7 +135,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     env = config.option.env
 
-    if config.option.regression:
+    if config.option.regression or True:
 
         file_path = f'{env}_regression_results.json'
         with open(file_path, 'w') as file:
