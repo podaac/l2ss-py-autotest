@@ -451,15 +451,18 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
                 if lat_var_name in list(nc_d.groups[g].variables.keys()):
                     group_list.append(g)
                     lat_group = '/'.join(group_list)
-                    subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=lat_group, decode_times=False)
-                    # add a science variable to the dataset if other groups are in the lat/lon group
-                    # some GPM collections won't have any other variables in the same group as lat/lon
-                    if len(list(nc_d.groups[g].groups.keys())) > 0:
-                        data_group = [v for v in list(nc_d.groups[g].groups.keys()) if 'time' not in str(v).lower()][0]
-                        g_data = lat_group+'/'+data_group
-                        subsetted_ds_data = xarray.open_dataset(subsetted_filepath, group=g_data, decode_times=False)
-                        sci_var = list(subsetted_ds_data.variables.keys())[0]
-                        subsetted_ds_new['science_test'] = subsetted_ds_data[sci_var]
+                    try:
+                        subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=lat_group, decode_times=False)
+                        # add a science variable to the dataset if other groups are in the lat/lon group
+                        # some GPM collections won't have any other variables in the same group as lat/lon
+                        if len(list(nc_d.groups[g].groups.keys())) > 0:
+                            data_group = [v for v in list(nc_d.groups[g].groups.keys()) if 'time' not in str(v).lower()][0]
+                            g_data = lat_group+'/'+data_group
+                            subsetted_ds_data = xarray.open_dataset(subsetted_filepath, group=g_data, decode_times=False)
+                            sci_var = list(subsetted_ds_data.variables.keys())[0]
+                            subsetted_ds_new['science_test'] = subsetted_ds_data[sci_var]
+                    except Exception:
+                        continue
                     break
                 # recall the function on a group that has groups in it and didn't find latitude
                 # this is going 'deeper' into the groups
