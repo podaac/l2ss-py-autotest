@@ -385,6 +385,59 @@ def find_variable(ds, var_name):
         var_ds = ds.get(var_name.rsplit("/", 1)[-1], None)
     return var_ds
 
+def walk_netcdf_groups(subsetted_filepath, lat_var_name):
+
+    with netCDF4.Dataset(subsetted_filepath) as f:
+        group_list = []
+        subsetted_ds_new = None
+        
+        def group_walk(groups, nc_d, current_group):
+            nonlocal subsetted_ds_new
+            
+            # Check if the top group has lat or lon variable
+            if lat_var_name in nc_d.variables:
+                subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=current_group, decode_times=False)
+                return True  # Found latitude variable
+            
+            # Loop through the groups in the current layer
+            for g in groups:
+                # End the loop if we've already found latitude
+                if subsetted_ds_new:
+                    break
+                
+                # Check if the current group has latitude variable
+                if lat_var_name in nc_d.groups[g].variables:
+                    lat_group = '/'.join(group_list + [g])
+                    try:
+                        subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=lat_group, decode_times=False)
+                        
+                        # Add a science variable to the dataset if other groups are present
+                        if nc_d.groups[g].groups:
+                            data_group = next((v for v in nc_d.groups[g].groups if 'time' not in v.lower()), None)
+                            if data_group:
+                                g_data = f"{lat_group}/{data_group}"
+                                subsetted_ds_data = xarray.open_dataset(subsetted_filepath, group=g_data, decode_times=False)
+                                sci_var = list(subsetted_ds_data.variables.keys())[0]
+                                subsetted_ds_new['science_test'] = subsetted_ds_data[sci_var]
+                    except Exception as ex:
+                        print(f"Error while processing group {g}: {ex}")
+                        continue
+                    
+                    break  # Exit the loop once we found the latitude group
+
+                # Recursively call the function on the nested groups
+                if nc_d.groups[g].groups:
+                    group_list.append(g)
+                    found = group_walk(nc_d.groups[g].groups, nc_d.groups[g], g)
+                    group_list.pop()  # Clean up after recursion
+                    if found:
+                        break
+
+        group_walk(f.groups, f, '')
+        
+    return subsetted_ds_new
+
+
 @pytest.mark.timeout(600)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token, skip_spatial):
@@ -430,49 +483,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     lat_var_name = lat_var_name.split('/')[-1]
     lon_var_name = lon_var_name.split('/')[-1]
 
-    with netCDF4.Dataset(subsetted_filepath) as f:
-        group_list = []
-        def group_walk(groups, nc_d, current_group):
-            global subsetted_ds_new
-            subsetted_ds_new = None
-            # check if the top group has lat or lon variable
-            if lat_var_name in list(nc_d.variables.keys()):
-                subsetted_ds_new = subsetted_ds
-            else:
-                # if not then we'll need to keep track of the group layers
-                group_list.append(current_group)
-
-            # loop through the groups in the current layer
-            for g in groups:
-                # end the loop if we've already found latitude
-                if subsetted_ds_new:
-                    break
-                # check if the groups have latitude, define the dataset and end the loop if found
-                if lat_var_name in list(nc_d.groups[g].variables.keys()):
-                    group_list.append(g)
-                    lat_group = '/'.join(group_list)
-                    try:
-                        subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=lat_group, decode_times=False)
-                        # add a science variable to the dataset if other groups are in the lat/lon group
-                        # some GPM collections won't have any other variables in the same group as lat/lon
-                        if len(list(nc_d.groups[g].groups.keys())) > 0:
-                            data_group = [v for v in list(nc_d.groups[g].groups.keys()) if 'time' not in str(v).lower()][0]
-                            g_data = lat_group+'/'+data_group
-                            subsetted_ds_data = xarray.open_dataset(subsetted_filepath, group=g_data, decode_times=False)
-                            sci_var = list(subsetted_ds_data.variables.keys())[0]
-                            subsetted_ds_new['science_test'] = subsetted_ds_data[sci_var]
-                    except Exception:
-                        continue
-                    break
-                # recall the function on a group that has groups in it and didn't find latitude
-                # this is going 'deeper' into the groups
-                if len(list(nc_d.groups[g].groups.keys())) > 0:
-                    group_walk(nc_d.groups[g].groups, nc_d.groups[g], g)
-                else:
-                    continue
-
-        group_walk(f.groups, f, '')
-
+    subsetted_ds_new = walk_netcdf_groups(subsetted_filepath, lat_var_name)
     assert lat_var_name and lon_var_name
 
     var_ds = None
