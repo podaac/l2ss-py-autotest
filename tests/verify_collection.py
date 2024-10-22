@@ -484,6 +484,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     lon_var_name = lon_var_name.split('/')[-1]
 
     subsetted_ds_new = walk_netcdf_groups(subsetted_filepath, lat_var_name)
+
     assert lat_var_name and lon_var_name
 
     var_ds = None
