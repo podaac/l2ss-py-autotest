@@ -2,6 +2,8 @@ import os
 import requests
 import json
 from datetime import datetime
+from groq import Groq
+import time
 
 def bearer_token(env):
     tokens = []
@@ -86,7 +88,6 @@ def get_collection_names(providers, env, collections_list):
 
                 # Make the GraphQL request with headers
                 response = requests.post(url, headers=headers, json=payload)
-                print(response)
                 # Check the status code
                 if response.status_code == 200:
                     # Parse the JSON response
@@ -168,25 +169,46 @@ def update_issue(repo_name, issue_number, issue_body, github_token):
 
     print(f"Issue updated successfully: {response.json()['html_url']}")
 
-def create_or_update_issue(repo_name, github_token, env):
+def summarize_error(client, error_message):
+
+    content = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
+
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "user",
+                "content": content
+            }
+        ],
+        model="llama-3.2-3b-preview",
+        temperature=0
+    )
+
+    result = chat_completion.choices[0].message.content
+    return result
+
+
+def create_or_update_issue(repo_name, github_token, env, groq_api_key):
+
+    client = Groq(
+        api_key=groq_api_key,
+    )
 
     upper_env = env.upper()
     issue_title = f"Regression test for {upper_env} ISSUES"
 
     results_file = f'{env}_regression_results.json'
-    current_associations_file = f'{env}_associations.json'
   
     with open(results_file, 'r') as file:
-        results = json.load(file)
+        test_results = json.load(file)
+
+    current_associations_file = f'{env}_associations.json'
 
     with open(current_associations_file, 'r') as file:
         current_associations = json.load(file)
-
-    failed = results.get('failed', [])
-    skipped = results.get('skipped',[])
-
+    
+    failed = test_results.get('failed', [])
     failed_concept_ids = [collection.get('concept_id') for collection in failed]
-    skipped_concept_ids =  [collection.get('concept_id') for collection in skipped]
 
     no_associations = []
     failed_test = []
@@ -197,39 +219,41 @@ def create_or_update_issue(repo_name, github_token, env):
         else:
             failed_test.append(collection_concept_id)
 
+    unique_no_associations = list(set(no_associations))
     providers = []
     issue_body = None
 
-    all_collections = failed_concept_ids + skipped_concept_ids
+    all_collections = failed_concept_ids
 
-    if len(failed) > 0 or len(skipped) > 0:
+    if len(failed) > 0:
 
         for collection in failed_concept_ids:
             provider = collection.split('-')[1]
             if provider not in providers:
                 providers.append(provider)
-        for collection in skipped_concept_ids:
-            provider = collection.split('-')[1]
-            if provider not in providers:
-                providers.append(provider)
+
+        for item in failed:
+            message = item.get('message')
+            try:
+                error_message = summarize_error(client, message)
+            except Exception:
+                error_message = "Unable to retrieve an error message"
+            item['error_message'] = error_message
+
+            time.sleep(10)
 
         collection_names = get_collection_names(providers, env, all_collections)
         issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
 
-        print(collection_names)
-
         if len(failed_test) > 0:
             issue_body += "\n FAILED: \n"
-            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('message')}" for cid in failed)
-        if len(skipped) > 0:
-            issue_body += "\n SKIPPED: \n"
-            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('message')}" for cid in skipped)
-        if len(no_associations) > 0:
+            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('error_message')}" for cid in failed)
+        if len(unique_no_associations) > 0:
             issue_body += "\n NO ASSOCIATIONS: \n"
-            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in no_associations)
+            issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in unique_no_associations)
 
     else:
-        issue_body = "There are no failed or skipped collections"
+        issue_body = "There are no failed collections"
 
     existing_issue_number = get_existing_issue_number(
         repo_name, issue_title, github_token)
@@ -242,12 +266,12 @@ def create_or_update_issue(repo_name, github_token, env):
         # Create a new issue
         create_issue(repo_name, issue_title, issue_body, github_token)
 
-
 if __name__ == "__main__":
     # Get repository and token from environment variables
     repo_name = os.getenv("GITHUB_REPOSITORY")
     github_token = os.getenv("GITHUB_TOKEN")
     env = os.getenv("ENV")
+    groq_api_key = os.getenv("GROQ_API_KEY")
 
     # Call the create_or_update_issue function with repository and token
-    create_or_update_issue(repo_name, github_token, env)
+    create_or_update_issue(repo_name, github_token, env, groq_api_key)

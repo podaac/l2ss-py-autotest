@@ -3,6 +3,10 @@ import pathlib
 import json
 import pytest
 import re
+import create_or_update_issue
+from groq import Groq
+import time
+import re
 
 try:
     os.environ['CMR_USER']
@@ -83,33 +87,22 @@ def get_error_message(report):
         else:
             error_message = str(report.longrepr)
 
-    exception_pattern = r"E\s+(\w+):\s+\(([^,]+),\s+'(.+?)'\)"
-    match = re.search(exception_pattern, error_message)
-
-    if match:
-        exception_type = match.group(1)  # 'Exception'
-        exception_reason = match.group(2)  # 'Not Found'
-        exception_message = match.group(3)  # 'Error: EULA ... could not be found.'
-
-        # Combine all into one message
-        full_message = f"Exception Type: {exception_type}, Reason: {exception_reason}, Message: {exception_message}"
-        return full_message
-    else:
-        return "No exception found."
+    pattern = r"bearer_token = '.*?'"
+    cleaned_text = re.sub(pattern, "", error_message)
+    
+    return cleaned_text
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
-    filtered_success, success, skipped, failed = [], [], [], []
-
-    test_results = {'success': filtered_success, 'failed': failed, 'skipped': skipped}
-
+    failed = []
     failed_tests = terminalreporter.stats.get('failed', [])
-    skipped_tests = terminalreporter.stats.get('skipped', [])
-    success_tests = terminalreporter.stats.get('passed', [])
+    error_tests = terminalreporter.stats.get('error', [])
 
-    if failed_tests:
-        for report in failed_tests:
+    all_failed_test = failed_tests + error_tests
+
+    if all_failed_test:
+        for report in all_failed_test:
 
             concept_id = list(report.keywords)[3]
 
@@ -122,7 +115,13 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             elif "temporal" in test_name:
                 test_type = "temporal"
 
-            full_message = get_error_message(report)
+            try:
+                full_message = get_error_message(report)
+            except Exception:
+                full_message = "Unable to retrive error message"
+
+            print(type(full_message))
+            print(full_message)
 
             failed.append({
                 "concept_id": concept_id,
@@ -130,45 +129,13 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 "message": full_message
             })
 
-    if skipped_tests:
-        for report in skipped_tests:
-
-            concept_id = list(report.keywords)[3]
-
-            # Extract the test name and exception message from the report
-            test_name = report.nodeid
-            test_type = None
-
-            if "spatial" in test_name:
-                test_type = "spatial"
-            elif "temporal" in test_name:
-                test_type = "temporal"
-
-            # If it's a regular test failure (not a skipped or xfailed test)
-            if hasattr(report, 'longreprtext'):
-                # Extract the short-form failure reason (in pytest >= 6)
-                error_message = report.longreprtext
-            else:
-                # Fallback if longreprtext is not available
-                if isinstance(report.longrepr, tuple):
-                    error_message = report.longrepr[2]
-                else:
-                    error_message = str(report.longrepr)
-
-            error = "UNKNOWN"
-            if isinstance(report.longreprtext, str):
-                tuple_error = eval(report.longreprtext)
-                error = tuple_error[2]
-
-            skipped.append({
-                "concept_id": concept_id,
-                "test_type": test_type,
-                "message": error
-            })
+    test_results = {
+        'failed': failed, 
+    }
 
     env = config.option.env
 
-    if config.option.regression:
+    if config.option.regression or True:
 
         file_path = f'{env}_regression_results.json'
         with open(file_path, 'w') as file:
@@ -181,5 +148,4 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 file_path = f'{env}_{outcome}.json'
                 with open(file_path, 'w') as file:
                     json.dump(tests, file)
-
 
