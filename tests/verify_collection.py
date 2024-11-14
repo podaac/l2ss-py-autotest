@@ -64,48 +64,40 @@ def read_skip_list(csv_file):
 # Fixture for the first skip list (skip_collections1.csv)
 @pytest.fixture(scope="session")
 def skip_temporal(env):
-    return read_skip_list(f"skip/skip_temporal_{env}.csv")
+    current_dir = os.path.dirname(__file__)
+    path = os.path.join(current_dir, f"skip/skip_temporal_{env}.csv")
+    return read_skip_list(path)
 
 
 # Fixture for the second skip list (skip_collections2.csv)
 @pytest.fixture(scope="session")
 def skip_spatial(env):
-    return read_skip_list(f"skip/skip_spatial_{env}.csv")
+    current_dir = os.path.dirname(__file__)
+    path = os.path.join(current_dir, f"skip/skip_spatial_{env}.csv")
+    return read_skip_list(path)
 
 
 @pytest.fixture(scope="session")
 def bearer_token(env: str, request_session: requests.Session) -> str:
-    tokens = []
-    headers: dict = {'Accept': 'application/json'}
-    url: str = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users"
+    url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
 
-    # First just try to get a token that already exists
     try:
-        resp = request_session.get(url + "/tokens", headers=headers,
-                                   auth=HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS']))
-        response_content = json.loads(resp.content)
+        # Make the request with the Base64-encoded Authorization header
+        resp = request_session.post(
+            url,
+            auth=HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS'])
+        )
 
-        for x in response_content:
-            tokens.append(x['access_token'])
+        # Check for successful response
+        if resp.status_code == 200:
+            response_content = resp.json()
+            return response_content.get('access_token')
 
-    except:  # noqa E722
-        logging.warning("Error getting the token - check user name and password", exc_info=True)
+    except Exception as e:
+        logging.warning(f"Error getting the token (status code {resp.status_code}): {e}", exc_info=True)
 
-    # No tokens exist, try to create one
-    if not tokens:
-        try:
-            resp = request_session.post(url + "/token", headers=headers,
-                                        auth=HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS']))
-            response_content: dict = json.loads(resp.content)
-            tokens.append(response_content['access_token'])
-        except:  # noqa E722
-            logging.warning("Error getting the token - check user name and password", exc_info=True)
-
-    # If still no token, then we can't do anything
-    if not tokens:
-        pytest.skip("Unable to get bearer token from EDL")
-
-    return next(iter(tokens))
+    # Skip the test if no token is found
+    pytest.skip("Unable to get bearer token from EDL")
 
 
 @pytest.fixture(scope="function")

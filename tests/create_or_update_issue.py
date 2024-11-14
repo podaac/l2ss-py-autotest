@@ -5,40 +5,24 @@ from datetime import datetime
 from groq import Groq
 import time
 
+
 def bearer_token(env):
-    tokens = []
-    headers: dict = {'Accept': 'application/json'}
-    url: str = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users"
+    url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
 
-    # First just try to get a token that already exists
     try:
-        resp = requests.get(url + "/tokens", headers=headers,
-                                   auth=requests.auth.HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS']))
-        response_content = json.loads(resp.content)
+        # Make the request with the Base64-encoded Authorization header
+        resp = request_session.post(
+            url,
+            auth=HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS'])
+        )
 
-        for x in response_content:
-            tokens.append(x['access_token'])
+        # Check for successful response
+        if resp.status_code == 200:
+            response_content = resp.json()
+            return response_content.get('access_token')
 
-    except Exception as ex:  # noqa E722
-        print(ex)
-        print("Error getting the token - check user name and password")
-
-    # No tokens exist, try to create one
-    if not tokens:
-        try:
-            resp = requests.post(url + "/token", headers=headers,
-                                        auth=requests.auth.HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS']))
-            response_content: dict = json.loads(resp.content)
-            tokens.append(response_content['access_token'])
-        except Exception as ex:  # noqa E722
-            print(ex)
-            print("Error getting the token - check user name and password")
-
-    # If still no token, then we can't do anything
-    if not tokens:
-        return None
-
-    return next(iter(tokens))
+    except Exception as e:
+        logging.warning(f"Error getting the token (status code {resp.status_code}): {e}", exc_info=True)
 
 
 def get_collection_names(providers, env, collections_list):
