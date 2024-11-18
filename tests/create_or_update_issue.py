@@ -11,7 +11,7 @@ def bearer_token(env):
 
     try:
         # Make the request with the Base64-encoded Authorization header
-        resp = request_session.post(
+        resp = requests.post(
             url,
             auth=HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS'])
         )
@@ -22,7 +22,8 @@ def bearer_token(env):
             return response_content.get('access_token')
 
     except Exception as e:
-        logging.warning(f"Error getting the token (status code {resp.status_code}): {e}", exc_info=True)
+        status_code = resp.status_code if 'resp' in locals() and resp else "N/A"
+        print(f"Error getting the token (status code {status_code}): {e}", exc_info=True)
 
 
 def get_collection_names(providers, env, collections_list):
