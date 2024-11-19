@@ -26,7 +26,6 @@ def bearer_token(env):
         status_code = resp.status_code if 'resp' in locals() and resp else "N/A"
         print(f"Error getting the token (status code {status_code}): {e}")
 
-
 def get_collection_names(providers, env, collections_list):
 
     lower_env = env.lower()
