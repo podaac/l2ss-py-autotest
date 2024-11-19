@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from groq import Groq
 import time
+from requests.auth import HTTPBasicAuth
 
 
 def bearer_token(env):
@@ -23,8 +24,7 @@ def bearer_token(env):
 
     except Exception as e:
         status_code = resp.status_code if 'resp' in locals() and resp else "N/A"
-        print(f"Error getting the token (status code {status_code}): {e}", exc_info=True)
-
+        print(f"Error getting the token (status code {status_code}): {e}")
 
 def get_collection_names(providers, env, collections_list):
 
