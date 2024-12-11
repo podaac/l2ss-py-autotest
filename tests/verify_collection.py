@@ -535,11 +535,13 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     lat_var_fill_value = subsetted_ds_new[lat_var_name].encoding.get('_FillValue')
     lon_var_fill_value = subsetted_ds_new[lon_var_name].encoding.get('_FillValue')
 
+    partial_pass = False
     if lat_var_fill_value:
         if (lat_max <= north or np.isclose(lat_max, north)) and (lat_min >= south or np.isclose(lat_min, south)):
             logging.info("Successful Latitude subsetting")
         elif np.isnan(lat_max) and np.isnan(lat_min):
             logging.info("Partial Lat Success - no Data")
+            partial_pass = True
         else:
             assert False
 
@@ -548,8 +550,16 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             logging.info("Successful Longitude subsetting")
         elif np.isnan(lon_max) and np.isnan(lon_min):
             logging.info("Partial Lon Success - no Data")
+            partial_pass = True
         else:
             assert False
+
+    if partial_pass:
+        valid_lon = np.isfinite(llon) & (llon != lon_var_fill_value)
+        valid_lat = np.isfinite(llat) & (llat != lat_var_fill_value)
+
+        if not np.any(valid_lon) or not np.any(valid_lat):
+            pytest.fail("No data in lon and lat")
 
 @pytest.mark.timeout(600)
 def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
