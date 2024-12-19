@@ -40,9 +40,6 @@ jobs:
         CMR_USER: ${{ secrets.CMR_USER }}
         CMR_PASS: ${{ secrets.CMR_PASS }}
         ENV: ${{ matrix.environment }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}      
       run: |
         poetry run python get_associations.py
         poetry run pytest -n 10 verify_collection.py --env ${{ matrix.environment }} --regression --junitxml=$GITHUB_WORKSPACE/test-results/${{ matrix.environment }}_test_report.xml || true
