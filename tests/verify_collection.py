@@ -430,7 +430,7 @@ def walk_netcdf_groups(subsetted_filepath, lat_var_name):
     return subsetted_ds_new
 
 
-@pytest.mark.timeout(600)
+@pytest.mark.timeout(1200)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token, skip_spatial):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
@@ -459,7 +459,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     # Submit harmony request and download result
     job_id = harmony_client.submit(harmony_request)
     logging.info("Submitted harmony job %s", job_id)
-    harmony_client.wait_for_processing(job_id, show_progress=True)
+    harmony_client.wait_for_processing(job_id, show_progress=False)
     subsetted_filepath = None
     for filename in [file_future.result()
                      for file_future
@@ -561,7 +561,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         if not np.any(valid_lon) or not np.any(valid_lat):
             pytest.fail("No data in lon and lat")
 
-@pytest.mark.timeout(600)
+@pytest.mark.timeout(1200)
 def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token, skip_temporal):
     test_spatial_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
@@ -588,5 +588,5 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
     job_id = harmony_client.submit(harmony_request)
     logging.info("Submitted harmony job %s", job_id)
 
-    harmony_client.wait_for_processing(job_id, show_progress=True)
+    harmony_client.wait_for_processing(job_id, show_progress=False)
     assert harmony_client.status(job_id).get('status') == "successful"
