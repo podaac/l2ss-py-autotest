@@ -68,7 +68,7 @@ jobs:
           echo "any_test_error=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_error > 0 }}" >> $GITHUB_OUTPUT
           echo "any_test_passed=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_succ > 0 }}" >> $GITHUB_OUTPUT
           echo "all_tests_succeeded_or_skipped=${{ fromJSON( steps.publish-test.outputs.json ).stats.tests_succ > 0 && fromJSON( steps.publish-test.outputs.json ).stats.tests_fail == 0 && fromJSON( steps.publish-test.outputs.json ).stats.tests_error == 0 }}" >> $GITHUB_ENV
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
