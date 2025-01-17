@@ -232,7 +232,7 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
 
         if len(failed_test) > 0:
             issue_body += "\n FAILED: \n"
-            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) - {cid.get('test_type')} test -  {cid.get('error_message')}" for cid in failed)
+            issue_body += "\n".join(f"{cid.get('concept_id')} ({collection_names.get(cid.get('concept_id'), '')}) —— {cid.get('test_type')} test —— {cid.get('error_message')}" for cid in failed)
         if len(unique_no_associations) > 0:
             issue_body += "\n NO ASSOCIATIONS: \n"
             issue_body += "\n".join(f"{cid} ({collection_names.get(cid, '')})" for cid in unique_no_associations)
