@@ -98,24 +98,13 @@ def get_collection_names(providers, env, collections_list):
     return collections
 
 
-def get_existing_issue_number(repo_name, issue_title, github_token):
-    url = f"https://api.github.com/repos/{repo_name}/issues"
+def get_existing_issue_number(env):
 
-    headers = {
-        'Authorization': f'token {github_token}',
-        'Accept': 'application/vnd.github.v3+json'
-    }
-
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-
-    issues = response.json()
-
-    for issue in issues:
-        if issue['title'] == issue_title:
-            return issue['number']
-
-    return None
+    # These are existing issue number for l2ss-py-autotest
+    if env == "OPS":
+        return "3496"
+    else:
+        return "3497"
 
 
 def create_issue(repo_name, issue_title, issue_body, github_token):
@@ -240,8 +229,7 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
     else:
         issue_body = "There are no failed collections"
 
-    existing_issue_number = get_existing_issue_number(
-        repo_name, issue_title, github_token)
+    existing_issue_number = get_existing_issue_number(upper_env)
 
     if existing_issue_number:
         # Update the existing issue
