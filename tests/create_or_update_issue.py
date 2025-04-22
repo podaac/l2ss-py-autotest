@@ -165,7 +165,7 @@ def summarize_error(client, error_message):
                 "content": content
             }
         ],
-        model="llama-3.2-3b-preview",
+        model="llama-3.1-8b-instant",
         temperature=0
     )
 
