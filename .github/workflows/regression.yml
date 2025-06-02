@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        environment: ['uat', 'ops']
+        environment: ['uat']
 
     steps:
     - name: Checkout Repository
