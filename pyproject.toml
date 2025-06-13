@@ -10,7 +10,7 @@ packages = [{include = "l2ss_py_autotest"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 python-cmr = "^0.13.0"
-harmony-py = "^0.5.1"
+harmony-py = "^1.2.0"
 matplotlib = "^3.7.2"
 netCDF4 = "^1.6.4"
 xarray = "^2024.9.0"
