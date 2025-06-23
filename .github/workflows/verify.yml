@@ -62,7 +62,7 @@ jobs:
         id: run-xml-to-json
         working-directory: tests
         run: |
-          poetry run python xml_to_json.py test-results/test_report.xml test-results/parsed_test_results.json
+          poetry run python xml_to_json.py $GITHUB_WORKSPACE/test-results/test_report.xml test-results/parsed_test_results.json
 
       - name: Publish Test Results
         id: publish-test
