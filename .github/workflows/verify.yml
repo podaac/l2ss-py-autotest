@@ -137,8 +137,12 @@ jobs:
       - name: Extract Labels
         id: extract-apply-labels
         run: |
-          labels=$(jq -r '.apply_labels | join(",")' test-results/parsed_test_results.json)
-          echo "labels=$labels" >> "$GITHUB_OUTPUT"
+          labels=$(jq -r '.apply_labels | join("\n")' test-results/parsed_test_results.json)
+          {
+            echo 'labels<<EOF'
+            echo "$labels"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Remove Unverified Label
         uses: actions-ecosystem/action-remove-labels@v1
