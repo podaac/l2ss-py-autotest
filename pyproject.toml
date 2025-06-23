@@ -19,6 +19,8 @@ l2ss-py = "^2.11.0"
 pygithub = "^2.4.0"
 pytest-xdist = "^3.6.1"
 groq = "^0.13.1"
+boto3 = "^1.38.36"
+junitparser = "^3.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.1"
