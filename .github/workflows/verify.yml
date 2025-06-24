@@ -107,6 +107,7 @@ jobs:
     name: Merge Pull Request
     runs-on: ubuntu-latest
     if: fromJSON( needs.verify_collection.outputs.all_tests_succeeded_or_skipped )
+    steps:
       - name: Remove Unverified Label
         uses: actions-ecosystem/action-remove-labels@v1
         with:
