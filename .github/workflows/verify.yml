@@ -106,8 +106,7 @@ jobs:
     needs: verify_collection
     name: Merge Pull Request
     runs-on: ubuntu-latest
-    if: fromJSON( needs.verify_collection.outputs.all_tests_passed )
-    steps:
+    if: fromJSON( needs.verify_collection.outputs.all_tests_succeeded_or_skipped )
       - name: Remove Unverified Label
         uses: actions-ecosystem/action-remove-labels@v1
         with:
@@ -162,30 +161,28 @@ jobs:
             **Action Needed**
             Tests have failed or encountered an unknown error. Open the status checks to view the logs and review the failure.
 
-  tests_skipped:
-    needs: verify_collection
-    name: Update Pull Request
-    runs-on: ubuntu-latest
-    if: fromJSON( needs.verify_collection.outputs.any_test_skipped )
-    steps:
-      - name: Remove Unverified Label
-        uses: actions-ecosystem/action-remove-labels@v1
-        with:
-          labels: |
-            unverified
-
-      - name: Add Skipped Label
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          labels: |
-            tests skipped
-
-      - name: Add Skipped Comment
-        uses: mshick/add-pr-comment@v2
-        with:
-          message: |
-            **Action Needed**
-            Unable to verify collection because test(s) were skipped.
-            Open the status check to view the logs from the test run and determine why tests were skipped.
-            If there is a justifiable reason, add a comment here and manually merge this PR to accept this unverified association.
-            Otherwise, fix the problem that caused the test to be skipped and rerun verification.
+  #tests_skipped:
+  #  needs: verify_collection
+  #  name: Update Pull Request
+  #  runs-on: ubuntu-latest
+  #  if: fromJSON( needs.verify_collection.outputs.any_test_skipped )
+  #  steps:
+  #    - name: Remove Unverified Label
+  #      uses: actions-ecosystem/action-remove-labels@v1
+  #      with:
+  #        labels: |
+  #          unverified
+  #    - name: Add Skipped Label
+  #      uses: actions-ecosystem/action-add-labels@v1
+  #      with:
+  #        labels: |
+  #          tests skipped
+  #    - name: Add Skipped Comment
+  #      uses: mshick/add-pr-comment@v2
+  #      with:
+  #        message: |
+  #          **Action Needed**
+  #          Unable to verify collection because test(s) were skipped.
+  #          Open the status check to view the logs from the test run and determine why tests were skipped.
+  #          If there is a justifiable reason, add a comment here and manually merge this PR to accept this unverified association.
+  #          Otherwise, fix the problem that caused the test to be skipped and rerun verification.

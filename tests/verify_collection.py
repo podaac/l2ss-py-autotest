@@ -97,7 +97,7 @@ def bearer_token(env: str, request_session: requests.Session) -> str:
         logging.warning(f"Error getting the token (status code {resp.status_code}): {e}", exc_info=True)
 
     # Skip the test if no token is found
-    pytest.skip("Unable to get bearer token from EDL")
+    pytest.fail("Unable to get bearer token from EDL")
 
 
 @pytest.fixture(scope="function")
@@ -576,26 +576,22 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
     if collection_concept_id in skip_temporal:
         pytest.skip(f"Known collection to skip for temporal testing {collection_concept_id}")
 
-    # Skip all ob-daac temporal test, ob-daac data have no time variables
-    if "OB_CLOUD" not in collection_concept_id:
-        logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
+    start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
+    end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
+    temporal_subset = get_half_temporal_extent(start_time, end_time)
+    
+    # Build harmony request
+    harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
+    request_collection = harmony.Collection(id=collection_concept_id)
+    harmony_request = harmony.Request(collection=request_collection,
+                                      granule_id=[granule_json['meta']['concept-id']],
+                                      temporal=temporal_subset)
 
-        start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
-        end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
-        temporal_subset = get_half_temporal_extent(start_time, end_time)
-        
-        # Build harmony request
-        harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
-        request_collection = harmony.Collection(id=collection_concept_id)
-        harmony_request = harmony.Request(collection=request_collection,
-                                          granule_id=[granule_json['meta']['concept-id']],
-                                          temporal=temporal_subset)
+    logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
 
-        logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
+    # Submit harmony request and download result
+    job_id = harmony_client.submit(harmony_request)
+    logging.info("Submitted harmony job %s", job_id)
 
-        # Submit harmony request and download result
-        job_id = harmony_client.submit(harmony_request)
-        logging.info("Submitted harmony job %s", job_id)
-
-        harmony_client.wait_for_processing(job_id, show_progress=False)
-        assert harmony_client.status(job_id).get('status') == "successful"
+    harmony_client.wait_for_processing(job_id, show_progress=False)
+    assert harmony_client.status(job_id).get('status') == "successful"
