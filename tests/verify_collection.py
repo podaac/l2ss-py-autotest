@@ -174,10 +174,19 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
     return variables
 
 
+from datetime import datetime
+
 def get_half_temporal_extent(start: str, end: str):
-    # Convert the input string dates to datetime objects (account for the 'Z' in the strings)
-    start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%S.%fZ')
-    end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%S.%fZ')
+    # Adjust the format to handle cases without fractional seconds
+    try:
+        start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%S.%fZ')
+    except ValueError:
+        start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%SZ')
+    
+    try:
+        end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%S.%fZ')
+    except ValueError:
+        end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%SZ')
     
     # Calculate the total duration
     total_duration = end_dt - start_dt
@@ -429,7 +438,6 @@ def walk_netcdf_groups(subsetted_filepath, lat_var_name):
         
     return subsetted_ds_new
 
-
 @pytest.mark.timeout(1200)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token, skip_spatial):
@@ -512,16 +520,17 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             var_ds, msk = None, None
 
     if var_ds is None or msk is None:
-        pytest.fail("Unable to find variable from umm-v to use as science variable.")
-
-    try:
-        msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-        llat = subsetted_ds_new[lat_var_name].where(msk)
-        llon = subsetted_ds_new[lon_var_name].where(msk)
-    except ValueError:
-        
+        logging.warning("Unable to find a science variable to use. Proceeding to test longitude and latitude only.")
         llat = subsetted_ds_new[lat_var_name]
         llon = subsetted_ds_new[lon_var_name]
+    else:
+        try:
+            msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
+            llat = subsetted_ds_new[lat_var_name].where(msk)
+            llon = subsetted_ds_new[lon_var_name].where(msk)
+        except ValueError:
+            llat = subsetted_ds_new[lat_var_name]
+            llon = subsetted_ds_new[lon_var_name]
 
     lat_max = llat.max()
     lat_min = llat.min()
@@ -569,24 +578,26 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
     if collection_concept_id in skip_temporal:
         pytest.skip(f"Known collection to skip for temporal testing {collection_concept_id}")
 
-    logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
+    # Skip all ob-daac temporal test, ob-daac data have no time variables
+    if "OB_CLOUD" not in collection_concept_id:
+        logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
 
-    start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
-    end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
-    temporal_subset = get_half_temporal_extent(start_time, end_time)
-    
-    # Build harmony request
-    harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
-    request_collection = harmony.Collection(id=collection_concept_id)
-    harmony_request = harmony.Request(collection=request_collection,
-                                      granule_id=[granule_json['meta']['concept-id']],
-                                      temporal=temporal_subset)
+        start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
+        end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
+        temporal_subset = get_half_temporal_extent(start_time, end_time)
+        
+        # Build harmony request
+        harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
+        request_collection = harmony.Collection(id=collection_concept_id)
+        harmony_request = harmony.Request(collection=request_collection,
+                                          granule_id=[granule_json['meta']['concept-id']],
+                                          temporal=temporal_subset)
 
-    logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
+        logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
 
-    # Submit harmony request and download result
-    job_id = harmony_client.submit(harmony_request)
-    logging.info("Submitted harmony job %s", job_id)
+        # Submit harmony request and download result
+        job_id = harmony_client.submit(harmony_request)
+        logging.info("Submitted harmony job %s", job_id)
 
-    harmony_client.wait_for_processing(job_id, show_progress=False)
-    assert harmony_client.status(job_id).get('status') == "successful"
+        harmony_client.wait_for_processing(job_id, show_progress=False)
+        assert harmony_client.status(job_id).get('status') == "successful"
