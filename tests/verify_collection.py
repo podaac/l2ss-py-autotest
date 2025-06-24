@@ -174,8 +174,6 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
     return variables
 
 
-from datetime import datetime
-
 def get_half_temporal_extent(start: str, end: str):
     # Adjust the format to handle cases without fractional seconds
     try:
