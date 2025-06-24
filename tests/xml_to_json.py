@@ -1,6 +1,7 @@
 import sys
 import json
 from junitparser import JUnitXml, JUnitXmlError
+import re
 
 def extract_labels(case):
     """Extract labels based on test case results."""
@@ -8,6 +9,10 @@ def extract_labels(case):
     for result in case.result:
         if hasattr(result, "message") and "No granules found" in str(result.message):
             labels.append("No Granules")
+        if hasattr(result, "message") and "There are no umm-v associated with this collection" in str(result.message):
+            labels.append("No UMM-V")
+        if hasattr(result, "message") and re.search(r"Failed: Timeout \(>\d+(\.\d+)?s\) from pytest-timeout", str(result.message)):
+            labels.append("Timeout")
     if not labels:
         labels.append('Other')
     return labels
