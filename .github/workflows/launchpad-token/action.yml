@@ -6,10 +6,14 @@ inputs:
   aws-secret-access-key:
     required: true
   aws-region:
-    required: true
+    required: false
     default: us-west-2
   lambda-function:
     required: true
+outputs:
+  result:
+    description: "The SM token retrieved from Lambda"
+    value: ${{ steps.get-token.outputs.result }}
 runs:
   using: "composite"
   steps:
@@ -21,7 +25,7 @@ runs:
         aws-region: ${{ inputs.aws-region }}
 
     - name: Invoke Launchpad Token Lambda
-      id: launchpad_token
+      id: get-token
       shell: bash
       run: |
         OUTPUT_FILE=result.json
@@ -41,4 +45,3 @@ runs:
         RESULT=$(jq -r '.sm_token' < "$OUTPUT_FILE")
         echo "::add-mask::$RESULT"
         echo "result=$RESULT" >> $GITHUB_OUTPUT
-

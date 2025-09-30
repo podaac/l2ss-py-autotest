@@ -50,8 +50,8 @@ jobs:
         id: diff_uat
         run: |
           ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
-          poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt --token ${{ steps.uat_token.outputs.result }} > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
-          echo "new_uat_associations=$(poetry run python tests/collection_names.py --env uat --token ${{ steps.uat_token.outputs.result }} --file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt)" >> $GITHUB_OUTPUT
+          poetry run cmr_association_diff -e uat -t service -p POCLOUD -n 'PODAAC L2 Cloud Subsetter' -a $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt --token "${{ steps.uat_token.outputs.result }}" > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
+          echo "new_uat_associations=$(poetry run python tests/collection_names.py --env uat --token "${{ steps.uat_token.outputs.result }}"--file $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt)" >> $GITHUB_OUTPUT
           rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
           rm $GITHUB_WORKSPACE/tests/cmr/l2ss-py/new_uat_associations.txt
 
