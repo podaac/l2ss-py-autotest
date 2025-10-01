@@ -39,8 +39,8 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
         run: |
-          curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ steps.uat_token.outputs.result }}" >cmr_metadata.json
-          curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ steps.ops_token.outputs.result }}" >cmr_metadata_uat.json
+          curl "https://cmr.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ steps.ops_token.outputs.result }}" >cmr_metadata.json
+          curl "https://cmr.uat.earthdata.nasa.gov/search/collections.umm_json?service_name=PODAAC%20L2%20Cloud%20Subsetter&page_size=2000&token=${{ steps.uat_token.outputs.result }}" >cmr_metadata_uat.json
 
           cat cmr_metadata_uat.json | jq -r '.items[] | select(.meta."concept-id" == "C1254854962-LARC_CLOUD")' | jq -r '.umm.ShortName'
 
