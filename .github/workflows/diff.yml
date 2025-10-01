@@ -48,7 +48,7 @@ jobs:
 
       - name: Run diff in UAT
         env:
-          UAT_TOKEN_TEMP: ${{ steps.ops_token.outputs.result }}
+          UAT_TOKEN_TEMP: ${{ steps.uat_token.outputs.result }}
         id: diff_uat
         run: |
           ls $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat/ > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat_associations.txt
