@@ -162,7 +162,7 @@ def summarize_error(client, error_message):
     result = chat_completion.choices[0].message.content
     return result
 
-def bedrock_summarize_error(runtime, error_message)
+def bedrock_summarize_error(runtime, error_message):
 
     model_id = "openai.gpt-oss-120b-1:0"   # example
     prompt = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
