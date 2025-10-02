@@ -176,10 +176,9 @@ def bedrock_summarize_error(runtime, error_message):
         })
     )
 
-    print(response)
-
     result = json.loads(response["body"].read())
     raw_answer = result["choices"][0]["message"]["content"]
+    print(result)
 
     # Remove any <reasoning>...</reasoning> blocks
     clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
