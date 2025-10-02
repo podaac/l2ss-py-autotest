@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        environment: ['uat', 'ops']
+        environment: ['uat']
 
     steps:
     - name: Checkout Repository
@@ -43,6 +43,13 @@ jobs:
       run: |
         poetry run python get_associations.py
         poetry run pytest -n 10 verify_collection.py --env ${{ matrix.environment }} --regression --junitxml=$GITHUB_WORKSPACE/test-results/${{ matrix.environment }}_test_report.xml || true
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_UAT }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_UAT }}
+        aws-region: us-west-2
 
     - name: Run Create Issues Script
       working-directory: tests

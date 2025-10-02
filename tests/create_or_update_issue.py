@@ -5,7 +5,8 @@ from datetime import datetime
 from groq import Groq
 import time
 from requests.auth import HTTPBasicAuth
-
+import boto3
+import re
 
 def bearer_token(env):
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
@@ -161,12 +162,34 @@ def summarize_error(client, error_message):
     result = chat_completion.choices[0].message.content
     return result
 
+def bedrock_summarize_error(runtime, error_message)
+
+    model_id = "openai.gpt-oss-120b-1:0"   # example
+    prompt = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
+
+    response = runtime.invoke_model(
+        modelId=model_id,
+        body=json.dumps({
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 200,
+            "temperature": 0.7
+        })
+    )
+
+    result = json.loads(response["body"].read())
+    raw_answer = result["choices"][0]["message"]["content"]
+
+    # Remove any <reasoning>...</reasoning> blocks
+    clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
+    return clean_answer
 
 def create_or_update_issue(repo_name, github_token, env, groq_api_key):
 
     client = Groq(
         api_key=groq_api_key,
     )
+    runtime = boto3.client(service_name="bedrock-runtime", region_name="us-west-2")
+
 
     upper_env = env.upper()
     issue_title = f"Regression test for {upper_env} ISSUES"
@@ -209,12 +232,12 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
         for item in failed:
             message = item.get('message')
             try:
-                error_message = summarize_error(client, message)
+                error_message = bedrock_summarize_error(runtime, message)
+                #error_message = summarize_error(client, message)
             except Exception:
                 error_message = "Unable to retrieve an error message"
             item['error_message'] = error_message
-
-            time.sleep(10)
+            #time.sleep(10)
 
         collection_names = get_collection_names(providers, env, all_collections)
         issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
