@@ -165,7 +165,12 @@ def summarize_error(client, error_message):
 def bedrock_summarize_error(runtime, error_message):
 
     model_id = "openai.gpt-oss-120b-1:0"   # example
-    prompt = f"summarize a descriptive error message in 10 words with only summary in response {error_message}"
+    prompt = (
+        "You are a summarizer. "
+        "Summarize the following error message in exactly 10 words. "
+        "Output ONLY the summary, no explanations, no reasoning, no extra text. "
+        f"Error message: {error_message}"
+    )
 
     response = runtime.invoke_model(
         modelId=model_id,
@@ -177,11 +182,14 @@ def bedrock_summarize_error(runtime, error_message):
     )
 
     result = json.loads(response["body"].read())
-    raw_answer = result["choices"][0]["message"]["content"]
-    print(result)
 
-    # Remove any <reasoning>...</reasoning> blocks
-    clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
+    raw_answer = result["choices"][0]["message"]["content"]
+
+    # keep only the first line, strip reasoning if any
+    clean_answer = re.sub(r"<.*?>.*?</.*?>", "", raw_answer, flags=re.DOTALL).strip()
+    clean_answer = clean_answer.splitlines()[0]
+
+    print(result)
     return clean_answer
 
 def create_or_update_issue(repo_name, github_token, env, groq_api_key):
