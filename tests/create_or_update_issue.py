@@ -172,9 +172,11 @@ def bedrock_summarize_error(runtime, error_message):
         body=json.dumps({
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 200,
-            "temperature": 0.7
+            "temperature": 0
         })
     )
+
+    print(response)
 
     result = json.loads(response["body"].read())
     raw_answer = result["choices"][0]["message"]["content"]
