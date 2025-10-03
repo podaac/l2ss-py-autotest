@@ -244,8 +244,8 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
             message = item.get('message')
             try:
                 error_message = bedrock_summarize_error(runtime, message)
-                #error_message = summarize_error(client, message)
-            except Exception:
+            except Exception as ex:
+                print(ex)
                 error_message = "Unable to retrieve an error message"
             item['error_message'] = error_message
             #time.sleep(10)
