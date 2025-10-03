@@ -166,9 +166,9 @@ def bedrock_summarize_error(runtime, error_message):
 
     model_id = "openai.gpt-oss-120b-1:0"   # example
     prompt = (
-        "You are a summarizer. "
         "Summarize the following error message in exactly 10 words. "
-        "Output ONLY the summary, no explanations, no reasoning, no extra text. "
+        "Output ONLY the 10-word summary as plain text. "
+        "Do not include reasoning, explanations, tags, or extra text. "
         f"Error message: {error_message}"
     )
 
@@ -185,8 +185,10 @@ def bedrock_summarize_error(runtime, error_message):
 
     raw_answer = result["choices"][0]["message"]["content"]
 
-    # keep only the first line, strip reasoning if any
-    clean_answer = re.sub(r"<.*?>.*?</.*?>", "", raw_answer, flags=re.DOTALL).strip()
+    # Remove any <reasoning>…</reasoning> block
+    clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
+
+    # Keep only the first non-empty line
     clean_answer = clean_answer.splitlines()[0]
 
     print(result)
