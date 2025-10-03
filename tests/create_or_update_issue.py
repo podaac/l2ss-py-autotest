@@ -183,15 +183,12 @@ def bedrock_summarize_error(runtime, error_message):
 
     result = json.loads(response["body"].read())
 
+    print(result)
     raw_answer = result["choices"][0]["message"]["content"]
-
     # Remove any <reasoning>…</reasoning> block
     clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
-
     # Keep only the first non-empty line
     clean_answer = clean_answer.splitlines()[0]
-
-    print(result)
     return clean_answer
 
 def create_or_update_issue(repo_name, github_token, env, groq_api_key):
