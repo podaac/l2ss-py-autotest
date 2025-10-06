@@ -61,14 +61,14 @@ def pytest_generate_tests(metafunc):
         associations = os.listdir(cmr_dirpath.joinpath(association_dir))
 
         associations  = [
+            "C1261072650-POCLOUD",
             "C1275819072-LAADSCDUAT",
             "C1229246430-GES_DISC",
             "C1233405381-GES_DISC",
             "C1261072651-POCLOUD",
-            "C1261072650-POCLOUD",
             "C1268674275-GES_DISC",
             "C1240739526-POCLOUD",
-            "C1256946216-ASDC_DEV2",
+            "C1256946216-ASDC_DEV2", 
             "C1215667655-GES_DISC"
         ]
 

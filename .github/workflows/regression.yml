@@ -42,7 +42,7 @@ jobs:
         ENV: ${{ matrix.environment }}
       run: |
         poetry run python get_associations.py
-        poetry run pytest -n 10 verify_collection.py --env ${{ matrix.environment }} --regression --junitxml=$GITHUB_WORKSPACE/test-results/${{ matrix.environment }}_test_report.xml || true
+        poetry run pytest -v -n 10 verify_collection.py --env ${{ matrix.environment }} --regression --junitxml=$GITHUB_WORKSPACE/test-results/${{ matrix.environment }}_test_report.xml || true
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
