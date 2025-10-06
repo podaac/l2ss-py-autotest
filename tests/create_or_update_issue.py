@@ -176,7 +176,7 @@ def bedrock_summarize_error(runtime, error_message):
         modelId=model_id,
         body=json.dumps({
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 200,
+            "max_tokens": 1000,
             "temperature": 0
         })
     )
