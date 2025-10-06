@@ -69,9 +69,7 @@ def pytest_generate_tests(metafunc):
             "C1268674275-GES_DISC",
             "C1240739526-POCLOUD",
             "C1256946216-ASDC_DEV2",
-            "C1261072651-POCLOUD",
-            "C1215667655-GES_DISC",
-            "C1229246430-GES_DISC",
+            "C1215667655-GES_DISC"
         ]
 
         if 'collection_concept_id' in metafunc.fixturenames and associations is not None:
