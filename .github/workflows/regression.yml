@@ -74,7 +74,7 @@ jobs:
 
       - name: Run Regression
         run: |
-        poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
 
   process-chunk-2:
     needs: generate-chunks
@@ -114,7 +114,7 @@ jobs:
 
       - name: Run Regression
         run: |
-        poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
 
   process-chunk-3:
     needs: generate-chunks
@@ -154,7 +154,7 @@ jobs:
 
       - name: Run Regression
         run: |
-        poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
 
   process-chunk-4:
     needs: generate-chunks
@@ -194,7 +194,7 @@ jobs:
 
       - name: Run Regression
         run: |
-        poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
 
   process-chunk-5:
     needs: generate-chunks
@@ -234,4 +234,4 @@ jobs:
 
       - name: Run Regression
         run: |
-        poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
