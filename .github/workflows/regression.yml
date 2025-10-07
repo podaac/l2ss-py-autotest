@@ -14,15 +14,31 @@ jobs:
       - name: Collect files from both folders
         id: set-matrix
         run: |
-          # Collect all files from both folders
-          files=($(ls tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*))
 
-          # Build a JSON array with { env, file } for each entry
-          json=$(printf '%s\n' "${files[@]}" \
-            | jq -R 'split("/") | {env: .[3], file: .[4]}' \
-            | jq -s '{include: .}')
+        files=($(ls tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*))
+        matrix_json='{"include":['
 
-          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+        first=true
+        for f in "${files[@]}"; do
+          folder=$(basename $(dirname "$f"))   # ops or uat
+          file=$(basename "$f")                # file name
+
+          if [ "$first" = true ]; then
+            first=false
+          else
+            matrix_json+=","
+          fi
+
+          matrix_json+="{\"env\":\"$folder\",\"file\":\"$file\"}"
+        done
+        matrix_json+="]}"
+
+        # Export safely to GitHub Actions
+        {
+          echo "matrix<<EOF"
+          echo "$matrix_json"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
 
   process-file:
     needs: generate-matrix
