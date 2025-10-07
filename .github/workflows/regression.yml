@@ -43,7 +43,6 @@ jobs:
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
       CMR_PASS: ${{ secrets.CMR_PASS }}
-      ENV: ${{ matrix.environment }}
     strategy:
       matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk1) }}
     steps:
@@ -86,7 +85,6 @@ jobs:
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
       CMR_PASS: ${{ secrets.CMR_PASS }}
-      ENV: ${{ matrix.environment }}    
     strategy:
       max-parallel: 3
       matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk2) }}
@@ -130,7 +128,6 @@ jobs:
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
       CMR_PASS: ${{ secrets.CMR_PASS }}
-      ENV: ${{ matrix.environment }}    
     strategy:
       max-parallel: 3
       matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk3) }}
@@ -174,7 +171,6 @@ jobs:
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
       CMR_PASS: ${{ secrets.CMR_PASS }}
-      ENV: ${{ matrix.environment }}    
     strategy:
       max-parallel: 3
       matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk4) }}
@@ -218,7 +214,6 @@ jobs:
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
       CMR_PASS: ${{ secrets.CMR_PASS }}
-      ENV: ${{ matrix.environment }}    
     strategy:
       max-parallel: 3
       matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk5) }}
