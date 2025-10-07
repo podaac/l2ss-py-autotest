@@ -15,11 +15,11 @@ jobs:
         id: set-matrix
         run: |
           # Collect all files from both folders
-          files=($(ls ops/* uat/*))
+          files=($(ls tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*))
 
           # Build a JSON array with { env, file } for each entry
           json=$(printf '%s\n' "${files[@]}" \
-            | jq -R 'split("/") | {env: .[0], file: .[1]}' \
+            | jq -R 'split("/") | {env: .[3], file: .[4]}' \
             | jq -s '{include: .}')
 
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
