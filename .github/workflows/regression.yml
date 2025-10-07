@@ -29,7 +29,11 @@ jobs:
             json=$(printf '%s\n' "${chunk[@]}" \
                     | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
                     | jq -s '{include: .}')
-            echo "chunk$((i+1))=$json" >> "$GITHUB_OUTPUT"
+            {
+              echo "chunk$((i+1))<<EOF"
+              echo "$json"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           done
 
   process-chunk-1:
