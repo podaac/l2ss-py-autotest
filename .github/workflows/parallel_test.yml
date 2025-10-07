@@ -1,0 +1,42 @@
+name: Parallel Jobs per File (ops + uat with env)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect files from both folders
+        id: set-matrix
+        run: |
+          # Collect all files from both folders
+          files=($(ls ops/* uat/*))
+
+          # Build a JSON array with { env, file } for each entry
+          json=$(printf '%s\n' "${files[@]}" \
+            | jq -R 'split("/") | {env: .[0], file: .[1]}' \
+            | jq -s '{include: .}')
+
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+  process-file:
+    needs: generate-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    env:
+      ENVIRONMENT: ${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show environment and file info
+        run: |
+          echo "Environment: $ENVIRONMENT"
+          echo "File: ${{ matrix.file }}"
+          echo "Full path: $ENVIRONMENT/${{ matrix.file }}"
+          cat "$ENVIRONMENT/${{ matrix.file }}"
