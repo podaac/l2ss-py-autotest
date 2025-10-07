@@ -38,7 +38,8 @@ jobs:
     strategy:
       matrix:
         file: ${{ fromJson(needs.generate-chunks.outputs.chunk1) }}
-    ENVIRONMENT: ${{ matrix.file.env }}
+    env:
+      ENVIRONMENT: ${{ matrix.file.env }}
     steps:
       - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
 
