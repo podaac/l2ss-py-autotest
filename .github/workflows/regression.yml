@@ -21,6 +21,7 @@ jobs:
           total=${#files[@]}
           chunks=5
           chunk_size=$(( (total + chunks - 1) / chunks ))  # ceil division
+          chunk_size = 3
 
           for i in $(seq 0 4); do
             start=$((i * chunk_size))
@@ -44,7 +45,7 @@ jobs:
     steps:
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
-        
+
       - name: Get job-specific URL
         run: |
           curl -s \
@@ -65,11 +66,13 @@ jobs:
 
       - name: Get job-specific URL
         run: |
-          curl -s \
+          echo "Fetching job URL for ${{ github.job }}..."
+          JOB_URL=$(curl -s \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url')
+          echo "Job URL: $JOB_URL"
 
   process-chunk-3:
     needs: generate-chunks
@@ -83,11 +86,13 @@ jobs:
 
       - name: Get job-specific URL
         run: |
-          curl -s \
+          echo "Fetching job URL for ${{ github.job }}..."
+          JOB_URL=$(curl -s \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url')
+          echo "Job URL: $JOB_URL"
 
   process-chunk-4:
     needs: generate-chunks
@@ -101,11 +106,13 @@ jobs:
 
       - name: Get job-specific URL
         run: |
-          curl -s \
+          echo "Fetching job URL for ${{ github.job }}..."
+          JOB_URL=$(curl -s \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url')
+          echo "Job URL: $JOB_URL"
 
   process-chunk-5:
     needs: generate-chunks
@@ -119,8 +126,10 @@ jobs:
 
       - name: Get job-specific URL
         run: |
-          curl -s \
+          echo "Fetching job URL for ${{ github.job }}..."
+          JOB_URL=$(curl -s \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url')
+          echo "Job URL: $JOB_URL"
