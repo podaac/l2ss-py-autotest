@@ -45,13 +45,13 @@ jobs:
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
         
-    - name: Get job-specific URL
-      run: |
-        curl -s \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-          | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+      - name: Get job-specific URL
+        run: |
+          curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
 
   process-chunk-2:
     needs: generate-chunks
@@ -63,13 +63,13 @@ jobs:
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
-    - name: Get job-specific URL
-      run: |
-        curl -s \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-          | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+      - name: Get job-specific URL
+        run: |
+          curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
 
   process-chunk-3:
     needs: generate-chunks
@@ -81,13 +81,13 @@ jobs:
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
-    - name: Get job-specific URL
-      run: |
-        curl -s \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-          | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+      - name: Get job-specific URL
+        run: |
+          curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
 
   process-chunk-4:
     needs: generate-chunks
@@ -99,13 +99,13 @@ jobs:
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
-    - name: Get job-specific URL
-      run: |
-        curl -s \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-          | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+      - name: Get job-specific URL
+        run: |
+          curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
 
   process-chunk-5:
     needs: generate-chunks
@@ -117,10 +117,10 @@ jobs:
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
-    - name: Get job-specific URL
-      run: |
-        curl -s \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-          | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
+      - name: Get job-specific URL
+        run: |
+          curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name==$JOB) | .html_url'
