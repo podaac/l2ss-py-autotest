@@ -40,53 +40,44 @@ jobs:
     needs: generate-chunks
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        file: ${{ fromJson(needs.generate-chunks.outputs.chunk1) }}
-    env:
-      ENVIRONMENT: ${{ matrix.file.env }}
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk1) }}
     steps:
-      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
+      - name: Print env and file
+        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
   process-chunk-2:
     needs: generate-chunks
     runs-on: ubuntu-latest
     strategy:
-      matrix: 
-        file: ${{ fromJson(needs.generate-chunks.outputs.chunk2) }}
-    env:
-      ENVIRONMENT: ${{ matrix.file.env }}
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk2) }}
     steps:
-      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
+      - name: Print env and file
+        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
   process-chunk-3:
     needs: generate-chunks
     runs-on: ubuntu-latest
     strategy:
-      matrix: 
-        file: ${{ fromJson(needs.generate-chunks.outputs.chunk3) }}
-    env:
-      ENVIRONMENT: ${{ matrix.file.env }}
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk3) }}
     steps:
-      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
+      - name: Print env and file
+        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
   process-chunk-4:
     needs: generate-chunks
     runs-on: ubuntu-latest
     strategy:
-      matrix: 
-        file: ${{ fromJson(needs.generate-chunks.outputs.chunk4) }}
-    env:
-      ENVIRONMENT: ${{ matrix.file.env }}
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk4) }}
     steps:
-      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
+      - name: Print env and file
+        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
   process-chunk-5:
     needs: generate-chunks
     runs-on: ubuntu-latest
     strategy:
-      matrix: 
-        file: ${{ fromJson(needs.generate-chunks.outputs.chunk5) }}
-    env:
-      ENVIRONMENT: ${{ matrix.file.env }}
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk5) }}
     steps:
-      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
+      - name: Print env and file
+        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
+
