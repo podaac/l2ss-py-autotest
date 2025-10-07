@@ -21,7 +21,7 @@ jobs:
           total=${#files[@]}
           chunks=5
           chunk_size=$(( (total + chunks - 1) / chunks ))  # ceil division
-          chunk_size = 3
+          chunk_size=3
 
           for i in $(seq 0 4); do
             start=$((i * chunk_size))
