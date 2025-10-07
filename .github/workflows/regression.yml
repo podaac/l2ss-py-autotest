@@ -4,55 +4,80 @@ on:
   workflow_dispatch:
 
 jobs:
-  generate-matrix:
+  generate-chunks:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      chunk1: ${{ steps.set.outputs.chunk1 }}
+      chunk2: ${{ steps.set.outputs.chunk2 }}
+      chunk3: ${{ steps.set.outputs.chunk3 }}
+      chunk4: ${{ steps.set.outputs.chunk4 }}
+      chunk5: ${{ steps.set.outputs.chunk5 }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Collect files from both folders
-        id: set-matrix
+      - id: set
         run: |
+          shopt -s nullglob
+          files=(tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*)
+          total=${#files[@]}
+          chunks=5
+          chunk_size=$(( (total + chunks - 1) / chunks ))  # ceil division
 
-          files=($(ls tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*))
-          matrix_json='{"include":['
-
-          first=true
-          for f in "${files[@]}"; do
-            folder=$(basename $(dirname "$f"))   # ops or uat
-            file=$(basename "$f")                # file name
-
-            if [ "$first" = true ]; then
-              first=false
-            else
-              matrix_json+=","
-            fi
-
-            matrix_json+="{\"env\":\"$folder\",\"file\":\"$file\"}"
+          for i in $(seq 0 4); do
+            start=$((i * chunk_size))
+            end=$((start + chunk_size))
+            chunk=("${files[@]:start:chunk_size}")
+            json=$(printf '%s\n' "${chunk[@]}" \
+                    | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
+                    | jq -s '{include: .}')
+            echo "chunk$((i+1))=$json" >> "$GITHUB_OUTPUT"
           done
-          matrix_json+="]}"
 
-          # Export safely to GitHub Actions
-          {
-            echo "matrix<<EOF"
-            echo "$matrix_json"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-  process-file:
-    needs: generate-matrix
+  process-chunk-1:
+    needs: generate-chunks
     runs-on: ubuntu-latest
     strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+      matrix: file: ${{ fromJson(needs.generate-chunks.outputs.chunk1) }}
     env:
-      ENVIRONMENT: ${{ matrix.env }}
+      ENVIRONMENT: ${{ matrix.file.env }}
     steps:
-      - uses: actions/checkout@v4
+      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
 
-      - name: Show environment and file info
-        run: |
-          echo "Environment: $ENVIRONMENT"
-          echo "File: ${{ matrix.file }}"
-          echo "Full path: $ENVIRONMENT/${{ matrix.file }}"
-          cat "$ENVIRONMENT/${{ matrix.file }}"
+  process-chunk-2:
+    needs: generate-chunks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: file: ${{ fromJson(needs.generate-chunks.outputs.chunk2) }}
+    env:
+      ENVIRONMENT: ${{ matrix.file.env }}
+    steps:
+      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
+
+  process-chunk-3:
+    needs: generate-chunks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: file: ${{ fromJson(needs.generate-chunks.outputs.chunk3) }}
+    env:
+      ENVIRONMENT: ${{ matrix.file.env }}
+    steps:
+      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
+
+  process-chunk-4:
+    needs: generate-chunks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: file: ${{ fromJson(needs.generate-chunks.outputs.chunk4) }}
+    env:
+      ENVIRONMENT: ${{ matrix.file.env }}
+    steps:
+      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
+
+  process-chunk-5:
+    needs: generate-chunks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: file: ${{ fromJson(needs.generate-chunks.outputs.chunk5) }}
+    env:
+      ENVIRONMENT: ${{ matrix.file.env }}
+    steps:
+      - run: echo "Processing $ENVIRONMENT/${{ matrix.file.file }}"
