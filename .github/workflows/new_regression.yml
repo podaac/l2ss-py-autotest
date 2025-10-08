@@ -12,36 +12,41 @@ jobs:
       chunk3: ${{ steps.set.outputs.chunk3 }}
       chunk4: ${{ steps.set.outputs.chunk4 }}
       chunk5: ${{ steps.set.outputs.chunk5 }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: set
-        run: |
-          shopt -s nullglob
-          files=(tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*)
-          total=${#files[@]}
-          chunk_size=250  # Stay under 256 matrix limit
-          chunk_size=3
+  steps:
+    - id: set
+      run: |
+        # List of test collections
+        files=(
+          "C1261072650-POCLOUD"
+          "C1275819072-LAADSCDUAT"
+          "C1261072651-POCLOUD"
+          "C1233405381-GES_DISC"
+          "C1268674275-GES_DISC"
+          "C1258816710-ASDC_DEV2"
+          "C1261072650-POCLOUD"
+          "C1240739526-POCLOUD"
+          "C1215667655-GES_DISC"
+          "C1240557252-GES_DISC"
+          "C1215720436-GES_DISC"
+        )
 
-          num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
-          
-          for i in $(seq 0 $((num_chunks - 1))); do
-            [ $i -ge 5 ] && break
-            
-            start=$((i * chunk_size))
-            chunk=("${files[@]:start:chunk_size}")
-            
-            [ ${#chunk[@]} -eq 0 ] && continue
-            
-            json=$(printf '%s\n' "${chunk[@]}" \
-              | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
-              | jq -s '{include: .}')
-            
-            {
-              echo "chunk$((i+1))<<EOF"
-              echo "$json"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          done
+        env="uat"
+        chunk_size=3   # Split into chunks of 3
+        total=${#files[@]}
+        num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
+
+        for i in $(seq 0 $((num_chunks - 1))); do
+          start=$((i * chunk_size))
+          chunk=("${files[@]:start:chunk_size}")
+
+          json=$(printf '%s\n' "${chunk[@]}" \
+            | jq -R --arg env "$env" '{env: $env, file: .}' \
+            | jq -s '.')
+
+          echo "chunk$((i+1))<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$json" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+        done
 
   process-chunk-1:
     needs: generate-chunks

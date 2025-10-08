@@ -9,7 +9,7 @@ on:
       max-parallel:
         required: false
         type: number
-        default: 3
+        default: 2
     secrets:
       CMR_USER:
         required: true
@@ -27,6 +27,17 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(inputs.chunk-data) }}
     steps:
+
+      - name: Get job-specific URL
+        run: |
+          echo "Fetching job URL for ${{ github.job }}..."
+          JOB_URL=$(curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name | startswith($JOB)) | .html_url')
+          echo "Job URL: $JOB_URL"
+
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
@@ -50,3 +61,7 @@ jobs:
         working-directory: tests
         run: |
           poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+
+
+
+          
