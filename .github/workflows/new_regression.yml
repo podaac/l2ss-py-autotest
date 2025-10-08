@@ -31,7 +31,6 @@ jobs:
               "tests/cmr/l2ss-py/uat/C1233405381-GES_DISC"
               "tests/cmr/l2ss-py/uat/C1268674275-GES_DISC"
               "tests/cmr/l2ss-py/uat/C1258816710-ASDC_DEV2"
-              "tests/cmr/l2ss-py/uat/C1261072650-POCLOUD"
               "tests/cmr/l2ss-py/uat/C1240739526-POCLOUD"
               "tests/cmr/l2ss-py/uat/C1215667655-GES_DISC"
               "tests/cmr/l2ss-py/uat/C1240557252-GES_DISC"
