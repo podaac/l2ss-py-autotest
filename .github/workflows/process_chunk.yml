@@ -30,6 +30,23 @@ jobs:
 
       - name: Get job-specific URL
         run: |
+          echo "Fetching job URL for current matrix job..."
+          JOB_URL=$(curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            | jq -r --arg JOB "${{ github.job }}" --argjson MATRIX "${{ toJson(matrix) }}" '
+                .jobs[]
+                | select(.name | startswith($JOB))
+                | select(.name | contains($MATRIX.chunk))
+                | .html_url
+            ')
+          echo "Job URL: $JOB_URL"
+          echo "JOB_URL=$JOB_URL" >> $GITHUB_ENV
+
+
+      - name: Get job-specific URL
+        run: |
           echo "Fetching job URL for ${{ github.job }}..."
           JOB_URL=$(curl -s \
             -H "Accept: application/vnd.github+json" \
@@ -37,6 +54,7 @@ jobs:
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
             | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name | startswith($JOB)) | .html_url')
           echo "Job URL: $JOB_URL"
+
 
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
@@ -64,4 +82,3 @@ jobs:
 
 
 
-          
