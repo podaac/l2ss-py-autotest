@@ -19,11 +19,11 @@ jobs:
           shopt -s nullglob
           files=(tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*)
           total=${#files[@]}
+          total=11
           chunk_size=250  # Stay under 256 matrix limit
-          chuck_size=3
+          chunk_size=3
+          num_chunks=5
 
-          num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
-          
           files=(
               "tests/cmr/l2ss-py/uat/C1261072650-POCLOUD"
               "tests/cmr/l2ss-py/uat/C1275819072-LAADSCDUAT"
