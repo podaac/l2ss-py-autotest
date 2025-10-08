@@ -30,35 +30,27 @@ jobs:
       matrix: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
-      - name: Echo current matrix job URL
+      - name: Get matrix job URL
         run: |
-          echo "Fetching URL for current matrix job..."
-
-          # Get all jobs in this workflow run
-          RESPONSE=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs")
-
-          # Get the job ID that matches this matrix job
-          JOB_ID=$(echo "$RESPONSE" | jq -r --arg JOB "$GITHUB_JOB" '.jobs[] | select(.name | startswith($JOB)) | .id')
-
-          # Construct the job URL
-          JOB_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs/$JOB_ID"
-
-          # Echo it
-          echo "Matrix job URL: $JOB_URL"
-
-
-      - name: Get job-specific URL
-        run: |
-          echo "Fetching job URL for ${{ github.job }}..."
-          JOB_URL=$(curl -s \
+          echo "Fetching job URL for matrix job..."
+          MATRIX_JOB_URL=$(curl -s \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name | startswith($JOB)) | .html_url')
-          echo "Job URL: $JOB_URL"
+            | jq -r '.jobs[] | select(.id == ${{ github.job }}) | .html_url // empty')
+          
+          # Fallback: find by matching job name and matrix values
+          if [ -z "$MATRIX_JOB_URL" ]; then
+            MATRIX_JOB_URL=$(curl -s \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+              | jq -r --arg ENV "${{ matrix.env }}" --arg FILE "${{ matrix.file }}" \
+                '.jobs[] | select(.name | contains($ENV) and contains($FILE)) | .html_url' | head -1)
+          fi
+          
+          echo "Job URL: ${MATRIX_JOB_URL:-Not yet available}"
+          echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
 
 
       - name: Print env and file
@@ -84,6 +76,3 @@ jobs:
         working-directory: tests
         run: |
           poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
-
-
-
