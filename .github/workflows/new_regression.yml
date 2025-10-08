@@ -1,0 +1,86 @@
+name: Regression UAT
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-chunks:
+    runs-on: ubuntu-latest
+    outputs:
+      chunk1: ${{ steps.set.outputs.chunk1 }}
+      chunk2: ${{ steps.set.outputs.chunk2 }}
+      chunk3: ${{ steps.set.outputs.chunk3 }}
+      chunk4: ${{ steps.set.outputs.chunk4 }}
+      chunk5: ${{ steps.set.outputs.chunk5 }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set
+        run: |
+          shopt -s nullglob
+          files=(tests/cmr/l2ss-py/uat/*)
+          total=${#files[@]}
+          chunk_size=250  # Stay under 256 limit
+          
+          num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
+          
+          for i in $(seq 0 $((num_chunks - 1))); do
+            [ $i -ge 5 ] && break  # Max 5 chunks (adjust if needed)
+            
+            start=$((i * chunk_size))
+            chunk=("${files[@]:start:chunk_size}")
+            
+            json=$(printf '%s\n' "${chunk[@]}" \
+              | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
+              | jq -s '{include: .}')
+            
+            {
+              echo "chunk$((i+1))<<EOF"
+              echo "$json"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          done
+
+  process-chunk-1:
+    needs: generate-chunks
+    if: needs.generate-chunks.outputs.chunk1 != ''
+    uses: ./.github/workflows/process-chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
+      max-parallel: 3
+
+  process-chunk-2:
+    needs: generate-chunks
+    if: needs.generate-chunks.outputs.chunk2 != ''
+    uses: ./.github/workflows/process-chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
+      max-parallel: 3
+
+  process-chunk-3:
+    needs: generate-chunks
+    if: needs.generate-chunks.outputs.chunk3 != ''
+    uses: ./.github/workflows/process-chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
+      max-parallel: 3
+
+  process-chunk-4:
+    needs: generate-chunks
+    if: needs.generate-chunks.outputs.chunk4 != ''
+    uses: ./.github/workflows/process-chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
+      max-parallel: 3
+
+  process-chunk-5:
+    needs: generate-chunks
+    if: needs.generate-chunks.outputs.chunk5 != ''
+    uses: ./.github/workflows/process-chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
+      max-parallel: 3
