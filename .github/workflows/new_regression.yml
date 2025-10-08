@@ -45,7 +45,7 @@ jobs:
   process-chunk-1:
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk1 != ''
-    uses: ./.github/workflows/process-chunk.yml
+    uses: ./.github/workflows/process_chunk.yml
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
@@ -53,7 +53,7 @@ jobs:
   process-chunk-2:
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk2 != ''
-    uses: ./.github/workflows/process-chunk.yml
+    uses: ./.github/workflows/process_chunk.yml
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
@@ -61,7 +61,7 @@ jobs:
   process-chunk-3:
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk3 != ''
-    uses: ./.github/workflows/process-chunk.yml
+    uses: ./.github/workflows/process_chunk.yml
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
@@ -69,7 +69,7 @@ jobs:
   process-chunk-4:
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk4 != ''
-    uses: ./.github/workflows/process-chunk.yml
+    uses: ./.github/workflows/process_chunk.yml
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
@@ -77,7 +77,7 @@ jobs:
   process-chunk-5:
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk5 != ''
-    uses: ./.github/workflows/process-chunk.yml
+    uses: ./.github/workflows/process_chunk.yml
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
