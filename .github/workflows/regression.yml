@@ -7,61 +7,72 @@ jobs:
   generate-chunks:
     runs-on: ubuntu-latest
     outputs:
-      chunk1: ${{ steps.set.outputs.chunk1 }}
-      chunk2: ${{ steps.set.outputs.chunk2 }}
-      chunk3: ${{ steps.set.outputs.chunk3 }}
-      chunk4: ${{ steps.set.outputs.chunk4 }}
-      chunk5: ${{ steps.set.outputs.chunk5 }}
+      chunks: ${{ steps.set.outputs.chunks }}
     steps:
       - uses: actions/checkout@v4
+
       - id: set
         run: |
           shopt -s nullglob
           files=(tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*)
           total=${#files[@]}
           chunks=5
-          chunk_size=$(( (total + chunks - 1) / chunks ))  # ceil division
-          chunk_size=2
+          chunk_size=$(( (total + chunks - 1) / chunks ))
+          chunk_size=2  # force for testing
 
-          for i in $(seq 0 4); do
+          declare -A chunks_map
+
+          for i in $(seq 0 $((chunks-1))); do
             start=$((i * chunk_size))
-            end=$((start + chunk_size))
             chunk=("${files[@]:start:chunk_size}")
             json=$(printf '%s\n' "${chunk[@]}" \
-                    | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
-                    | jq -s '{include: .}')
-            {
-              echo "chunk$((i+1))<<EOF"
-              echo "$json"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
+              | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
+              | jq -s '{include: .}')
+            chunks_map["chunk$((i+1))"]="$json"
           done
 
-  process-chunk-1:
+          all=$(printf '%s\n' "${!chunks_map[@]}" \
+            | jq -R . \
+            | jq -s --argjson c "$(printf '%s\n' "${chunks_map[@]}" | jq -s .)" '
+                reduce range(0; length) as $i ({}; .[.[ $i ]] = $c[$i])')
+
+          echo "chunks<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$all" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+  process-chunks:
     needs: generate-chunks
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        chunk-name: [chunk1, chunk2, chunk3, chunk4, chunk5]
+      fail-fast: false
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
       CMR_PASS: ${{ secrets.CMR_PASS }}
-    strategy:
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk1) }}
     steps:
-      - name: Print env and file
-        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
-
-      - name: Get job-specific URL
+      - name: Extract matrix data
+        id: extract
         run: |
-          echo "Fetching job URL for ${{ github.job }}..."
-          JOB_URL=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name | startswith($JOB)) | .html_url')
-          echo "Job URL: $JOB_URL"
+          echo '${{ needs.generate-chunks.outputs.chunks }}' > chunks.json
+          jq -c ".${{ matrix.chunk-name }}.include[]" chunks.json > items.json
+          echo "items<<EOF" >> "$GITHUB_OUTPUT"
+          cat items.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout Repository
+      - name: Run matrixed tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const items = JSON.parse(process.env.items);
+            console.log("Running tests for", items.length, "items");
+            for (const { env, file } of items) {
+              console.log(`Testing env=${env}, file=${file}`);
+            }
+
+      - name: Checkout repository
         uses: actions/checkout@v4
-    
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -72,186 +83,14 @@ jobs:
           poetry-version: 2.1.3
 
       - name: Poetry Install
-        run: |
-          poetry install
+        run: poetry install
 
       - name: Run Regression
         working-directory: tests
         run: |
-          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
-
-  process-chunk-2:
-    needs: generate-chunks
-    runs-on: ubuntu-latest
-    env:
-      CMR_USER: ${{ secrets.CMR_USER }}
-      CMR_PASS: ${{ secrets.CMR_PASS }}
-    strategy:
-      max-parallel: 3
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk2) }}
-    steps:
-      - name: Print env and file
-        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
-
-      - name: Get job-specific URL
-        run: |
-          echo "Fetching job URL for ${{ github.job }}..."
-          JOB_URL=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name | startswith($JOB)) | .html_url')
-          echo "Job URL: $JOB_URL"
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-    
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
-        with:
-          poetry-version: 2.1.3
-
-      - name: Poetry Install
-        run: |
-          poetry install
-
-      - name: Run Regression
-        working-directory: tests
-        run: |
-          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
-
-  process-chunk-3:
-    needs: generate-chunks
-    runs-on: ubuntu-latest
-    env:
-      CMR_USER: ${{ secrets.CMR_USER }}
-      CMR_PASS: ${{ secrets.CMR_PASS }}
-    strategy:
-      max-parallel: 3
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk3) }}
-    steps:
-      - name: Print env and file
-        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
-
-      - name: Get job-specific URL
-        run: |
-          echo "Fetching job URL for ${{ github.job }}..."
-          JOB_URL=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name | startswith($JOB)) | .html_url')
-          echo "Job URL: $JOB_URL"
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-    
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
-        with:
-          poetry-version: 2.1.3
-
-      - name: Poetry Install
-        run: |
-          poetry install
-
-      - name: Run Regression
-        working-directory: tests
-        run: |
-          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
-
-  process-chunk-4:
-    needs: generate-chunks
-    runs-on: ubuntu-latest
-    env:
-      CMR_USER: ${{ secrets.CMR_USER }}
-      CMR_PASS: ${{ secrets.CMR_PASS }}
-    strategy:
-      max-parallel: 3
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk4) }}
-    steps:
-      - name: Print env and file
-        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
-
-      - name: Get job-specific URL
-        run: |
-          echo "Fetching job URL for ${{ github.job }}..."
-          JOB_URL=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name | startswith($JOB)) | .html_url')
-          echo "Job URL: $JOB_URL"
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-    
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
-        with:
-          poetry-version: 2.1.3
-
-      - name: Poetry Install
-        run: |
-          poetry install
-
-      - name: Run Regression
-        working-directory: tests
-        run: |
-          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
-
-  process-chunk-5:
-    needs: generate-chunks
-    runs-on: ubuntu-latest
-    env:
-      CMR_USER: ${{ secrets.CMR_USER }}
-      CMR_PASS: ${{ secrets.CMR_PASS }}
-    strategy:
-      max-parallel: 3
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk5) }}
-    steps:
-      - name: Print env and file
-        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
-
-      - name: Get job-specific URL
-        run: |
-          echo "Fetching job URL for ${{ github.job }}..."
-          JOB_URL=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg JOB "${{ github.job }}" '.jobs[] | select(.name | startswith($JOB)) | .html_url')
-          echo "Job URL: $JOB_URL"
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-    
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
-        with:
-          poetry-version: 2.1.3
-
-      - name: Poetry Install
-        run: |
-          poetry install
-
-      - name: Run Regression
-        working-directory: tests
-        run: |
-          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+          echo '${{ steps.extract.outputs.items }}' | jq -c '.[]' | while read -r entry; do
+            env=$(echo "$entry" | jq -r '.env')
+            file=$(echo "$entry" | jq -r '.file')
+            echo "Running pytest for env=$env file=$file"
+            poetry run pytest verify_collection.py --env "$env" --concept_id "$file"
+          done
