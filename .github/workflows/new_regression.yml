@@ -95,3 +95,35 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
+
+  aggregate-failures:
+    needs:
+      - process-chunk-1
+      - process-chunk-2
+      - process-chunk-3
+      - process-chunk-4
+      - process-chunk-5
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download all job status artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: job-status-*
+          path: job-status
+
+      - name: Aggregate failed jobs and print URLs
+        run: |
+          failed_urls=()
+          for f in job-status/*/job_status.json; do
+            url=$(jq -r 'select(.status != "success") | .url' "$f")
+            if [ -n "$url" ] && [ "$url" != "null" ]; then
+              failed_urls+=("$url")
+            fi
+          done
+          if [ ${#failed_urls[@]} -gt 0 ]; then
+            echo "Failed job URLs:"
+            printf '%s\n' "${failed_urls[@]}"
+          else
+            echo "No failed jobs."
+          fi

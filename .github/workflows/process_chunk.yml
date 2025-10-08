@@ -92,3 +92,20 @@ jobs:
         working-directory: tests
         run: |
           poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+
+      - name: Save job status and URL
+        if: always()
+        run: |
+          jq -n \
+            --arg env "${{ matrix.env }}" \
+            --arg file "${{ matrix.file }}" \
+            --arg url "${{ env.MATRIX_JOB_URL }}" \
+            --arg status "${{ job.status }}" \
+            '{env: $env, file: $file, url: $url, status: $status}' > job_status.json
+
+      - name: Upload job status artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: job-status-${{ matrix.env }}-${{ matrix.file }}
+          path: job_status.json
