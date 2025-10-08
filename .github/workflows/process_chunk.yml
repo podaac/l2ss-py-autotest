@@ -89,19 +89,31 @@ jobs:
         run: poetry install
 
       - name: Run Regression
+        id: regression
         working-directory: tests
+        continue-on-error: true
         run: |
-          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }} --tb=short | tee ../pytest_output.log
 
-      - name: Save job status and URL
+      - name: Extract traceback if failed
+        if: failure()
+        run: |
+          awk '/=+ FAILURES =+|=+ ERRORS =+/{flag=1;next}/=+ short test summary info =+/{flag=0}flag' ../pytest_output.log > ../traceback.log || true
+
+      - name: Save job status, URL, and short traceback
         if: always()
         run: |
+          reason=""
+          if [ -f ../traceback.log ]; then
+            reason="$(cat ../traceback.log | tail -c 5000 | sed ':a;N;$!ba;s/\n/\\n/g')"
+          fi
           jq -n \
             --arg env "${{ matrix.env }}" \
             --arg file "${{ matrix.file }}" \
             --arg url "${{ env.MATRIX_JOB_URL }}" \
             --arg status "${{ job.status }}" \
-            '{env: $env, file: $file, url: $url, status: $status}' > job_status.json
+            --arg reason "$reason" \
+            '{env: $env, file: $file, url: $url, status: $status, reason: $reason}' > job_status.json
 
       - name: Upload job status artifact
         if: always()

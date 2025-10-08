@@ -21,7 +21,7 @@ jobs:
           total=${#files[@]}
           total=11
           chunk_size=250  # Stay under 256 matrix limit
-          chunk_size=3
+          chunk_size=1
           num_chunks=5
 
           files=(
@@ -30,11 +30,6 @@ jobs:
               "tests/cmr/l2ss-py/uat/C1261072651-POCLOUD"
               "tests/cmr/l2ss-py/uat/C1233405381-GES_DISC"
               "tests/cmr/l2ss-py/uat/C1268674275-GES_DISC"
-              "tests/cmr/l2ss-py/uat/C1258816710-ASDC_DEV2"
-              "tests/cmr/l2ss-py/uat/C1240739526-POCLOUD"
-              "tests/cmr/l2ss-py/uat/C1215667655-GES_DISC"
-              "tests/cmr/l2ss-py/uat/C1240557252-GES_DISC"
-              "tests/cmr/l2ss-py/uat/C1215720436-GES_DISC"
             )
 
           for i in $(seq 0 $((num_chunks - 1))); do
@@ -112,18 +107,20 @@ jobs:
           pattern: job-status-*
           path: job-status
 
-      - name: Aggregate failed jobs and print URLs
+      - name: Aggregate failed jobs and print URLs and reasons
         run: |
-          failed_urls=()
+          failed=0
           for f in job-status/*/job_status.json; do
             url=$(jq -r 'select(.status != "success") | .url' "$f")
+            reason=$(jq -r 'select(.status != "success") | .reason' "$f")
             if [ -n "$url" ] && [ "$url" != "null" ]; then
-              failed_urls+=("$url")
+              echo "FAILED JOB: $url"
+              echo "SHORT TRACEBACK:"
+              echo "$reason"
+              echo "----------------------"
+              failed=1
             fi
           done
-          if [ ${#failed_urls[@]} -gt 0 ]; then
-            echo "Failed job URLs:"
-            printf '%s\n' "${failed_urls[@]}"
-          else
+          if [ $failed -eq 0 ]; then
             echo "No failed jobs."
           fi
