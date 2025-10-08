@@ -37,21 +37,11 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r '.jobs[] | select(.id == ${{ github.job }}) | .html_url // empty')
-          
-          # Fallback: find by matching job name and matrix values
-          if [ -z "$MATRIX_JOB_URL" ]; then
-            MATRIX_JOB_URL=$(curl -s \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-              | jq -r --arg ENV "${{ matrix.env }}" --arg FILE "${{ matrix.file }}" \
-                '.jobs[] | select(.name | contains($ENV) and contains($FILE)) | .html_url' | head -1)
-          fi
+            | jq -r --arg ENV "${{ matrix.env }}" --arg FILE "${{ matrix.file }}" \
+              '.jobs[] | select(.name | contains($ENV) and contains($FILE)) | .html_url' | head -1)
           
           echo "Job URL: ${MATRIX_JOB_URL:-Not yet available}"
           echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
-
 
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
