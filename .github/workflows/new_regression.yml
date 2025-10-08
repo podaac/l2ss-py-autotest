@@ -20,7 +20,8 @@ jobs:
           files=(tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*)
           total=${#files[@]}
           chunk_size=250  # Stay under 256 matrix limit
-          
+          chunk_size=3
+
           num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
           
           for i in $(seq 0 $((num_chunks - 1))); do
