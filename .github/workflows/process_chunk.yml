@@ -30,19 +30,6 @@ jobs:
       matrix: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
-      - name: Get matrix job URL
-        run: |
-          echo "Fetching job URL for matrix job..."
-          MATRIX_JOB_URL=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
-            | jq -r --arg ENV "${{ matrix.env }}" --arg FILE "${{ matrix.file }}" \
-              '.jobs[] | select(.name | contains($ENV) and contains($FILE)) | .html_url' | head -1)
-          
-          echo "Job URL: ${MATRIX_JOB_URL:-Not yet available}"
-          echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
-
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
@@ -61,6 +48,19 @@ jobs:
 
       - name: Poetry Install
         run: poetry install
+
+      - name: Get matrix job URL
+        run: |
+          echo "Fetching job URL for matrix job..."
+          MATRIX_JOB_URL=$(curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
+            | jq -r --arg ENV "${{ matrix.env }}" --arg FILE "${{ matrix.file }}" \
+              '.jobs[] | select(.name | contains($ENV) and contains($FILE)) | .html_url' | head -1)
+          
+          echo "Job URL: ${MATRIX_JOB_URL:-Not yet available}"
+          echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
 
       - name: Run Regression
         working-directory: tests
