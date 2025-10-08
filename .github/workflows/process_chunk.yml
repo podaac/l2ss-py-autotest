@@ -64,11 +64,10 @@ jobs:
           echo "$JOBS_DATA" | jq -r '.jobs[] | "  - \(.name)"'
           echo ""
           
-          # Try to find the matching job
+          # Try to find the matching job using string interpolation
           MATRIX_JOB_URL=$(echo "$JOBS_DATA" | jq -r \
-            --arg ENV "${{ matrix.env }}" \
-            --arg FILE "${{ matrix.file }}" \
-            '.jobs[] | select(.name == "process (" + $ENV + ", " + $FILE + ")") | .html_url')
+            --arg target "process (${{ matrix.env }}, ${{ matrix.file }})" \
+            '.jobs[] | select(.name == $target) | .html_url')
           
           echo "Job URL: ${MATRIX_JOB_URL:-Not yet available}"
           echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
