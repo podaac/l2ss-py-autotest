@@ -1,7 +1,31 @@
-name: Regression UAT
+name: Parallel Jobs per File (ops + uat with env)
 
 on:
   workflow_dispatch:
+
+# YAML anchors to reduce duplication
+x-chunk-job: &chunk-job
+  runs-on: ubuntu-latest
+  env:
+    CMR_USER: ${{ secrets.CMR_USER }}
+    CMR_PASS: ${{ secrets.CMR_PASS }}
+  strategy:
+    max-parallel: 3
+    fail-fast: false
+  steps:
+    - name: Print env and file
+      run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+    - uses: abatilo/actions-poetry@v3
+      with:
+        poetry-version: 2.1.3
+    - run: poetry install
+    - name: Run Regression
+      working-directory: tests
+      run: poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
 
 jobs:
   generate-chunks:
@@ -17,17 +41,20 @@ jobs:
       - id: set
         run: |
           shopt -s nullglob
-          files=(tests/cmr/l2ss-py/uat/*)
+          files=(tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*)
           total=${#files[@]}
-          chunk_size=250  # Stay under 256 limit
-          
+          chunk_size=250  # Stay under 256 matrix limit
+          chunk_size=3
+
           num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
           
           for i in $(seq 0 $((num_chunks - 1))); do
-            [ $i -ge 5 ] && break  # Max 5 chunks (adjust if needed)
+            [ $i -ge 5 ] && break  # Max 5 chunks
             
             start=$((i * chunk_size))
             chunk=("${files[@]:start:chunk_size}")
+            
+            [ ${#chunk[@]} -eq 0 ] && continue
             
             json=$(printf '%s\n' "${chunk[@]}" \
               | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
@@ -41,46 +68,46 @@ jobs:
           done
 
   process-chunk-1:
+    <<: *chunk-job
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk1 != ''
-    uses: ./.github/workflows/process-chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
+    strategy:
       max-parallel: 3
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk1) }}
 
   process-chunk-2:
+    <<: *chunk-job
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk2 != ''
-    uses: ./.github/workflows/process-chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
+    strategy:
       max-parallel: 3
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk2) }}
 
   process-chunk-3:
+    <<: *chunk-job
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk3 != ''
-    uses: ./.github/workflows/process-chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
+    strategy:
       max-parallel: 3
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk3) }}
 
   process-chunk-4:
+    <<: *chunk-job
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk4 != ''
-    uses: ./.github/workflows/process-chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
+    strategy:
       max-parallel: 3
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk4) }}
 
   process-chunk-5:
+    <<: *chunk-job
     needs: generate-chunks
     if: needs.generate-chunks.outputs.chunk5 != ''
-    uses: ./.github/workflows/process-chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
+    strategy:
       max-parallel: 3
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk5) }}
