@@ -30,24 +30,24 @@ jobs:
       matrix: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
-    - name: Echo current matrix job URL
-      run: |
-        echo "Fetching URL for current matrix job..."
+      - name: Echo current matrix job URL
+        run: |
+          echo "Fetching URL for current matrix job..."
 
-        # Get all jobs in this workflow run
-        RESPONSE=$(curl -s \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer $GITHUB_TOKEN" \
-          "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs")
+          # Get all jobs in this workflow run
+          RESPONSE=$(curl -s \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs")
 
-        # Get the job ID that matches this matrix job
-        JOB_ID=$(echo "$RESPONSE" | jq -r --arg JOB "$GITHUB_JOB" '.jobs[] | select(.name | startswith($JOB)) | .id')
+          # Get the job ID that matches this matrix job
+          JOB_ID=$(echo "$RESPONSE" | jq -r --arg JOB "$GITHUB_JOB" '.jobs[] | select(.name | startswith($JOB)) | .id')
 
-        # Construct the job URL
-        JOB_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs/$JOB_ID"
+          # Construct the job URL
+          JOB_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs/$JOB_ID"
 
-        # Echo it
-        echo "Matrix job URL: $JOB_URL"
+          # Echo it
+          echo "Matrix job URL: $JOB_URL"
 
 
       - name: Get job-specific URL
