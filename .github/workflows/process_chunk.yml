@@ -51,13 +51,13 @@ jobs:
 
       - name: Get matrix job URL
         run: |
-          echo "Fetching job URL for matrix job..."
+          echo "Fetching job URL for matrix job (env=${{ matrix.env }}, file=${{ matrix.file }})..."
           MATRIX_JOB_URL=$(curl -s \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" \
             | jq -r --arg ENV "${{ matrix.env }}" --arg FILE "${{ matrix.file }}" \
-              '.jobs[] | select(.name | contains($ENV) and contains($FILE)) | .html_url' | head -1)
+              '.jobs[] | select(.name == "process (\($ENV), \($FILE))") | .html_url')
           
           echo "Job URL: ${MATRIX_JOB_URL:-Not yet available}"
           echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
