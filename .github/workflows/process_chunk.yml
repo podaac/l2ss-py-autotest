@@ -15,7 +15,9 @@ on:
         required: true
       CMR_PASS:
         required: true
-
+permissions:
+  actions: read   # needed to query jobs API
+  contents: read  # optional, if accessing repo files
 jobs:
   process:
     runs-on: ubuntu-latest
@@ -28,20 +30,25 @@ jobs:
       matrix: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
-      - name: Get job-specific URL
-        run: |
-          echo "Fetching job URL for current matrix job..."
+    - name: Echo current matrix job URL
+      run: |
+        echo "Fetching URL for current matrix job..."
 
-          # Get the full list of jobs in this run
-          JOB_URL=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
-            | jq -r --arg JOB "$GITHUB_JOB" \
-              '.jobs[] | select(.name | startswith($JOB)) | .html_url')
+        # Get all jobs in this workflow run
+        RESPONSE=$(curl -s \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs")
 
-          echo "Job URL: $JOB_URL"
-          echo "JOB_URL=$JOB_URL" >> $GITHUB_ENV
+        # Get the job ID that matches this matrix job
+        JOB_ID=$(echo "$RESPONSE" | jq -r --arg JOB "$GITHUB_JOB" '.jobs[] | select(.name | startswith($JOB)) | .id')
+
+        # Construct the job URL
+        JOB_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs/$JOB_ID"
+
+        # Echo it
+        echo "Matrix job URL: $JOB_URL"
+
 
       - name: Get job-specific URL
         run: |
