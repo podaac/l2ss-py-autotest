@@ -1,0 +1,52 @@
+name: Process Chunk
+
+on:
+  workflow_call:
+    inputs:
+      chunk-data:
+        required: true
+        type: string
+      max-parallel:
+        required: false
+        type: number
+        default: 3
+    secrets:
+      CMR_USER:
+        required: true
+      CMR_PASS:
+        required: true
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    env:
+      CMR_USER: ${{ secrets.CMR_USER }}
+      CMR_PASS: ${{ secrets.CMR_PASS }}
+    strategy:
+      max-parallel: ${{ inputs.max-parallel }}
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.chunk-data) }}
+    steps:
+      - name: Print env and file
+        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+    
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: 2.1.3
+
+      - name: Poetry Install
+        run: poetry install
+
+      - name: Run Regression
+        working-directory: tests
+        run: |
+          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
