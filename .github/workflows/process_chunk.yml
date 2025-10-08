@@ -30,6 +30,45 @@ jobs:
       matrix: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
+      - name: Get matrix job URL
+        run: |
+          echo "Fetching job URL for matrix job (env=${{ matrix.env }}, file=${{ matrix.file }})..."
+          
+          # Retry logic to find job URL (may take a moment for API to register)
+          MAX_RETRIES=5
+          RETRY_DELAY=5
+          MATRIX_JOB_URL=""
+          
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $attempt/$MAX_RETRIES..."
+            
+            JOBS_DATA=$(curl -s \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs")
+            
+            MATRIX_JOB_URL=$(echo "$JOBS_DATA" | jq -r \
+              --arg env "${{ matrix.env }}" \
+              --arg file "${{ matrix.file }}" \
+              '.jobs[] | select(.name | endswith("process (\($env), \($file))")) | .html_url')
+            
+            if [ -n "$MATRIX_JOB_URL" ]; then
+              echo "Found job URL: $MATRIX_JOB_URL"
+              break
+            fi
+            
+            if [ $attempt -lt $MAX_RETRIES ]; then
+              echo "Job not found yet, waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+            fi
+          done
+          
+          if [ -z "$MATRIX_JOB_URL" ]; then
+            echo "Job URL: Not available after $MAX_RETRIES attempts"
+          fi
+          
+          echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
+
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
@@ -48,31 +87,6 @@ jobs:
 
       - name: Poetry Install
         run: poetry install
-
-      - name: Get matrix job URL
-        run: |
-          echo "Fetching job URL for matrix job (env=${{ matrix.env }}, file=${{ matrix.file }})..."
-          
-          # Fetch jobs data once
-          JOBS_DATA=$(curl -s \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs")
-          
-          # Debug: show all job names
-          echo "All job names in this run:"
-          echo "$JOBS_DATA" | jq -r '.jobs[] | "  - \(.name)"'
-          echo ""
-          
-          # Try to find the matching job - job names include the parent job prefix
-          MATRIX_JOB_URL=$(echo "$JOBS_DATA" | jq -r \
-            --arg env "${{ matrix.env }}" \
-            --arg file "${{ matrix.file }}" \
-            '.jobs[] | select(.name | endswith("process (\($env), \($file))")) | .html_url')
-          
-          echo "Job URL: ${MATRIX_JOB_URL:-Not yet available}"
-          echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
-
 
       - name: Run Regression
         working-directory: tests
