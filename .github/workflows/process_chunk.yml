@@ -118,6 +118,7 @@ jobs:
             '{env: $env, file: $file, url: $url, status: $status, reason: $reason}' > job_status.json
 
       - name: Upload job status artifact
+        working-directory: tests
         uses: actions/upload-artifact@v4
         with:
           name: job-status-${{ matrix.env }}-${{ matrix.file }}
