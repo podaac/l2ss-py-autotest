@@ -107,5 +107,8 @@ jobs:
           path: job-status
 
       - name: Aggregate failed jobs and print URLs and reasons
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python3 tests/aggregate_results.py
