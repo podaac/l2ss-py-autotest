@@ -109,18 +109,4 @@ jobs:
 
       - name: Aggregate failed jobs and print URLs and reasons
         run: |
-          failed=0
-          for f in job-status/*/job_status.json; do
-            url=$(jq -r 'select(.status != "success") | .url' "$f")
-            reason=$(jq -r 'select(.status != "success") | .reason' "$f")
-            if [ -n "$url" ] && [ "$url" != "null" ]; then
-              echo "FAILED JOB: $url"
-              echo "SHORT TRACEBACK:"
-              echo "$reason"
-              echo "----------------------"
-              failed=1
-            fi
-          done
-          if [ $failed -eq 0 ]; then
-            echo "No failed jobs."
-          fi
+          python3 tests/aggregate_results.py

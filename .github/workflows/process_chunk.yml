@@ -100,12 +100,13 @@ jobs:
         run: |
           awk '/=+ FAILURES =+|=+ ERRORS =+/{flag=1;next}/=+ short test summary info =+/{flag=0}flag' ../pytest_output.log > ../traceback.log || true
 
-      - name: Save job status, URL, and short traceback
+      - name: Save job status, URL, and regression results
         if: always()
         run: |
           reason=""
-          if [ -f ../traceback.log ]; then
-            reason="$(cat ../traceback.log | tail -c 5000 | sed ':a;N;$!ba;s/\n/\\n/g')"
+          results_file="../${{ matrix.env }}_regression_results.json"
+          if [ -f "$results_file" ]; then
+            reason="$(cat "$results_file" | jq -c .)"
           fi
           jq -n \
             --arg env "${{ matrix.env }}" \
