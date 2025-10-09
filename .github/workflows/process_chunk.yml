@@ -118,11 +118,11 @@ jobs:
             '{env: $env, file: $file, url: $url, status: $status, reason: $reason}' > job_status.json
 
       - name: Upload job status artifact
-        working-directory: tests
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: job-status-${{ matrix.env }}-${{ matrix.file }}
-          path: job_status.json
+          path: tests/job_status.json 
 
       - name: Fail job if regression failed (from results)
         working-directory: tests
