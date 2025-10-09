@@ -5,6 +5,7 @@ import requests
 import time
 import boto3
 import re
+from requests.auth import HTTPBasicAuth
 
 def bearer_token(env):
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
