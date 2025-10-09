@@ -8,6 +8,8 @@ import re
 from requests.auth import HTTPBasicAuth
 
 def bearer_token(env):
+
+    env = env.lower()
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
 
     try:
@@ -46,7 +48,7 @@ def create_github_issue(repo, token, title, body, labels=None):
         print(f"Failed to create issue: {title} (status {response.status_code})\n{response.text}")
 
 
-def get_github_issue_by_title(repo, token, title, max_retries=3, delay=2):
+def get_github_issue_by_title(repo, token, title, max_retries=5, delay=2):
     url = f"https://api.github.com/repos/{repo}/issues"
     headers = {
         "Authorization": f"token {token}",
@@ -61,7 +63,10 @@ def get_github_issue_by_title(repo, token, title, max_retries=3, delay=2):
                 for issue in issues:
                     if issue.get("title") == title:
                         return issue
-                return None
+                # If not found, wait and retry
+                if attempt < max_retries:
+                    print(f"Issue with title '{title}' not found, retrying ({attempt}/{max_retries})...")
+                    time.sleep(delay)
             else:
                 print(f"Failed to fetch issues (attempt {attempt}): {response.status_code}\n{response.text}")
         except Exception as e:
