@@ -70,6 +70,16 @@ def create_or_update_github_issue(repo, token, title, body, labels=None):
         create_github_issue(repo, token, title, body, labels)
 
 
+def format_message(msg, max_lines=30):
+    import re
+    msg = msg.replace("\\n", "\n")
+    msg = re.sub(r'<[^>]+>', '', msg)
+    lines = msg.splitlines()
+    if len(lines) > max_lines:
+        lines = lines[:max_lines] + ['... (truncated) ...']
+    return "\n".join(lines)
+
+
 def main():
     job_status_files = glob.glob(os.path.join('job-status', '*', 'job_status.json'))
     failed = False
@@ -84,11 +94,14 @@ def main():
             print(f"FAILED JOB: {url}")
             print("REGRESSION RESULTS:")
             try:
-                # Pretty print the JSON if possible
                 reason_json = json.loads(reason)
+                # Format each failed message for better readability
+                if isinstance(reason_json, dict) and "failed" in reason_json:
+                    for fail in reason_json["failed"]:
+                        fail["message"] = format_message(fail["message"])
                 pretty_reason = json.dumps(reason_json, indent=2)
             except Exception:
-                pretty_reason = reason
+                pretty_reason = format_message(reason)
             print(pretty_reason)
             print("----------------------")
             failed = True
