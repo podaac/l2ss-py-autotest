@@ -92,14 +92,14 @@ jobs:
         id: regression
         working-directory: tests
         run: |
-          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }} --tb=short | tee ../pytest_output.log
+          poetry run pytest -n 2 verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }} --tb=short | tee ../pytest_output.log
 
       - name: Save job status, URL, and regression results
-        if: always()
+        working-directory: tests
         run: |
           reason=""
           status="success"
-          results_file="../${{ matrix.env }}_regression_results.json"
+          results_file="${{ matrix.env }}_regression_results.json"
           fail_count=0
           if [ -f "$results_file" ]; then
             reason="$(cat "$results_file" | jq -c .)"
@@ -118,14 +118,12 @@ jobs:
             '{env: $env, file: $file, url: $url, status: $status, reason: $reason}' > job_status.json
 
       - name: Upload job status artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: job-status-${{ matrix.env }}-${{ matrix.file }}
           path: job_status.json
 
       - name: Fail job if regression failed (from results)
-        if: always()
         run: |
           results_file="../${{ matrix.env }}_regression_results.json"
           fail_count=0
