@@ -3,6 +3,7 @@ import json
 import os
 import requests
 import time
+import boto3
 
 
 def create_github_issue(repo, token, title, body, labels=None):
@@ -80,11 +81,69 @@ def format_message(msg, max_lines=30):
     return "\n".join(lines)
 
 
+def bedrock_summarize_error(runtime, error_message):
+
+    model_id = "openai.gpt-oss-120b-1:0"   # example
+    prompt = (
+        "Summarize the following error message in exactly 10 words. "
+        "Output ONLY the 10-word summary as plain text. "
+        "Do not include reasoning, explanations, tags, or extra text. "
+        f"Error message: {error_message}"
+    )
+
+    response = runtime.invoke_model(
+        modelId=model_id,
+        body=json.dumps({
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 5000,
+            "temperature": 0
+        })
+    )
+
+    result = json.loads(response["body"].read())
+
+    print(result)
+    raw_answer = result["choices"][0]["message"]["content"]
+    # Remove any <reasoning>…</reasoning> block
+    clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
+    # Keep only the first non-empty line
+    clean_answer = clean_answer.splitlines()[0]
+    return clean_answer
+
+
+def bedrock_suggest_solution(runtime, error_message):
+    model_id = "openai.gpt-oss-120b-1:0"   # example
+    prompt = (
+        "Given the following error message, suggest a possible solution or next step. "
+        "Output ONLY the solution as plain text. "
+        "Do not include reasoning, explanations, tags, or extra text. "
+        f"Error message: {error_message}"
+    )
+    response = runtime.invoke_model(
+        modelId=model_id,
+        body=json.dumps({
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 5000,
+            "temperature": 0
+        })
+    )
+    result = json.loads(response["body"].read())
+    raw_answer = result["choices"][0]["message"]["content"]
+    # Remove any <reasoning>…</reasoning> block
+    clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
+    # Keep only the first non-empty line
+    clean_answer = clean_answer.splitlines()[0]
+    return clean_answer
+
+
 def main():
     job_status_files = glob.glob(os.path.join('job-status', '*', 'job_status.json'))
     failed = False
     repo = os.environ.get('GITHUB_REPOSITORY')
     token = os.environ.get('GITHUB_TOKEN')
+
+    runtime = boto3.client(service_name="bedrock-runtime", region_name="us-west-2")
+
     for fpath in job_status_files:
         with open(fpath) as f:
             data = json.load(f)
@@ -100,10 +159,13 @@ def main():
                     error_sections = []
                     for fail in reason_json["failed"]:
                         fail["message"] = format_message(fail["message"])
+                        solution = bedrock_suggest_solution(runtime, fail["message"])
                         section = (
                             f"### Concept ID: `{fail.get('concept_id', '')}` | Test Type: `{fail.get('test_type', '')}`\n"
                             f"**Error Message:**\n"
                             f"```text\n{fail.get('message', '').strip()}\n```\n"
+                            f"**Possible Solution:**\n"
+                            f"```text\n{solution}\n```\n"
                         )
                         error_sections.append(section)
                     pretty_reason = json.dumps(reason_json, indent=2)
