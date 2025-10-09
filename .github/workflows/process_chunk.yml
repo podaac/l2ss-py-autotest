@@ -98,15 +98,22 @@ jobs:
         if: always()
         run: |
           reason=""
+          status="success"
           results_file="../${{ matrix.env }}_regression_results.json"
+          fail_count=0
           if [ -f "$results_file" ]; then
             reason="$(cat "$results_file" | jq -c .)"
+            # Determine status from regression results JSON
+            fail_count=$(cat "$results_file" | jq '.failed | length')
+            if [ "$fail_count" != "0" ]; then
+              status="failure"
+            fi
           fi
           jq -n \
             --arg env "${{ matrix.env }}" \
             --arg file "${{ matrix.file }}" \
             --arg url "${{ env.MATRIX_JOB_URL }}" \
-            --arg status "${{ job.status }}" \
+            --arg status "$status" \
             --arg reason "$reason" \
             '{env: $env, file: $file, url: $url, status: $status, reason: $reason}' > job_status.json
 
@@ -116,3 +123,16 @@ jobs:
         with:
           name: job-status-${{ matrix.env }}-${{ matrix.file }}
           path: job_status.json
+
+      - name: Fail job if regression failed (from results)
+        if: always()
+        run: |
+          results_file="../${{ matrix.env }}_regression_results.json"
+          fail_count=0
+          if [ -f "$results_file" ]; then
+            fail_count=$(cat "$results_file" | jq '.failed | length')
+          fi
+          if [ "$fail_count" != "0" ]; then
+            echo "Regression failed (from results), marking job as failed."
+            exit 1
+          fi
