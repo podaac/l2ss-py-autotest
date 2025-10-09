@@ -91,7 +91,6 @@ jobs:
       - name: Run Regression
         id: regression
         working-directory: tests
-        continue-on-error: true
         run: |
           poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }} --tb=short | tee ../pytest_output.log
 
@@ -117,9 +116,3 @@ jobs:
         with:
           name: job-status-${{ matrix.env }}-${{ matrix.file }}
           path: job_status.json
-
-      - name: Fail job if regression failed
-        if: steps.regression.outcome == 'failure'
-        run: |
-          echo "Regression failed, marking job as failed."
-          exit 1
