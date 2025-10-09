@@ -97,19 +97,30 @@ def main():
                 reason_json = json.loads(reason)
                 # Format each failed message for better readability
                 if isinstance(reason_json, dict) and "failed" in reason_json:
+                    error_sections = []
                     for fail in reason_json["failed"]:
                         fail["message"] = format_message(fail["message"])
-                pretty_reason = json.dumps(reason_json, indent=2)
+                        section = (
+                            f"### Concept ID: `{fail.get('concept_id', '')}` | Test Type: `{fail.get('test_type', '')}`\n"
+                            f"**Error Message:**\n"
+                            f"```text\n{fail.get('message', '').strip()}\n```\n"
+                        )
+                        error_sections.append(section)
+                    pretty_reason = json.dumps(reason_json, indent=2)
+                    body_md = f"Job URL: {url}\n\nRegression Failures:\n\n" + "\n".join(error_sections)
+                else:
+                    pretty_reason = format_message(reason)
+                    body_md = f"Job URL: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
             except Exception:
                 pretty_reason = format_message(reason)
+                body_md = f"Job URL: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
             print(pretty_reason)
             print("----------------------")
             failed = True
             # Create or update GitHub issue if repo and token are available
             if repo and token:
                 title = f"Regression Failure: {data.get('env', '')} {data.get('file', '')}"
-                body = f"Job URL: {url}\n\nRegression Results:\n```json\n{pretty_reason}\n```"
-                create_or_update_github_issue(repo, token, title, body, labels=["regression-failure"])
+                create_or_update_github_issue(repo, token, title, body_md, labels=["regression-failure"])
     if not failed:
         print("No failed jobs.")
 
