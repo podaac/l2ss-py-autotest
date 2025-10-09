@@ -136,6 +136,23 @@ def bedrock_suggest_solution(runtime, error_message):
     return clean_answer
 
 
+def create_aggregated_github_issue(repo, token, all_failures):
+    title = "Aggregated Regression Failures"
+    body_lines = ["# Aggregated Regression Failures\n"]
+    for fail in all_failures:
+        concept_id = fail.get('concept_id', '')
+        env = fail.get('env', '')
+        job_url = fail.get('job_url', '')
+        issue_url = fail.get('issue_url', '')
+        # Ensure links are valid URLs or empty
+        job_url_str = f"[regression]({job_url})" if job_url and job_url.startswith('http') else ''
+        issue_url_str = f"[issue]({issue_url})" if issue_url and issue_url.startswith('http') else ''
+        line = f"- `{concept_id}` ({env}) {job_url_str} {issue_url_str}".strip()
+        body_lines.append(line)
+    body = "\n".join(body_lines)
+    create_github_issue(repo, token, title, body, labels=["regression-failure", "aggregated"])
+
+
 def main():
     job_status_files = glob.glob(os.path.join('job-status', '*', 'job_status.json'))
     failed = False
@@ -144,6 +161,7 @@ def main():
 
     runtime = boto3.client(service_name="bedrock-runtime", region_name="us-west-2")
 
+    all_failures = []
     for fpath in job_status_files:
         with open(fpath) as f:
             data = json.load(f)
@@ -154,12 +172,12 @@ def main():
             print("REGRESSION RESULTS:")
             try:
                 reason_json = json.loads(reason)
-                # Format each failed message for better readability
                 if isinstance(reason_json, dict) and "failed" in reason_json:
                     error_sections = []
                     for fail in reason_json["failed"]:
                         fail["message"] = format_message(fail["message"])
                         solution = bedrock_suggest_solution(runtime, fail["message"])
+                        # Create or update individual issue
                         section = (
                             f"### Concept ID: `{fail.get('concept_id', '')}` | Test Type: `{fail.get('test_type', '')}`\n"
                             f"**Error Message:**\n"
@@ -168,6 +186,26 @@ def main():
                             f"```text\n{solution}\n```\n"
                         )
                         error_sections.append(section)
+                        issue_url = None
+                        if repo and token:
+                            title = f"Regression Failure: {data.get('env', '')} {data.get('file', '')}"
+                            body_md = (
+                                f"Job URL: {url}\n\n" + section
+                            )
+                            issue = get_github_issue_by_title(repo, token, title)
+                            if not issue:
+                                create_github_issue(repo, token, title, body_md, labels=["regression-failure"])
+                                issue = get_github_issue_by_title(repo, token, title)
+                            if issue:
+                                issue_url = issue.get('html_url')
+                        all_failures.append({
+                            'concept_id': fail.get('concept_id', ''),
+                            'test_type': fail.get('test_type', ''),
+                            'message': fail.get('message', '').strip(),
+                            'solution': solution,
+                            'job_url': url,
+                            'issue_url': issue_url
+                        })
                     pretty_reason = json.dumps(reason_json, indent=2)
                     body_md = f"Job URL: {url}\n\nRegression Failures:\n\n" + "\n".join(error_sections)
                 else:
@@ -180,10 +218,11 @@ def main():
             print(pretty_reason)
             print("----------------------")
             failed = True
-            # Create or update GitHub issue if repo and token are available
             if repo and token:
                 title = f"Regression Failure: {data.get('env', '')} {data.get('file', '')}"
                 create_or_update_github_issue(repo, token, title, body_md, labels=["regression-failure"])
+    if all_failures and repo and token:
+        create_aggregated_github_issue(repo, token, all_failures)
     if not failed:
         print("No failed jobs.")
 
