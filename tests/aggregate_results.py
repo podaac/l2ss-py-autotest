@@ -173,7 +173,8 @@ def main():
                 else:
                     pretty_reason = format_message(reason)
                     body_md = f"Job URL: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
-            except Exception:
+            except Exception as ex:
+                print(ex)
                 pretty_reason = format_message(reason)
                 body_md = f"Job URL: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
             print(pretty_reason)
