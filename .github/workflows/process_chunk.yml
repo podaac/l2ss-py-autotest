@@ -124,8 +124,9 @@ jobs:
           path: job_status.json
 
       - name: Fail job if regression failed (from results)
+        working-directory: tests
         run: |
-          results_file="../${{ matrix.env }}_regression_results.json"
+          results_file="${{ matrix.env }}_regression_results.json"
           fail_count=0
           if [ -f "$results_file" ]; then
             fail_count=$(cat "$results_file" | jq '.failed | length')
