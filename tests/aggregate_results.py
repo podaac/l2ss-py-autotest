@@ -4,7 +4,7 @@ import os
 import requests
 import time
 import boto3
-
+import re
 
 def create_github_issue(repo, token, title, body, labels=None):
     url = f"https://api.github.com/repos/{repo}/issues"
