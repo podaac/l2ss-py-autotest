@@ -107,21 +107,8 @@ def format_message(msg, max_lines=30):
     return "\n".join(lines)
 
 
-def redact_secrets(text):
-    # Redact common secret patterns (tokens, passwords, etc.)
-    patterns = [
-        r'(?i)(token|password|pass|secret|cmr_user|cmr_pass)[^\s:]*[\s:=]+[^\s]+',
-        r'(?i)(ghp_[A-Za-z0-9]{36,})',  # GitHub personal access tokens
-        r'(?i)(eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+)',  # JWT
-        r'(?i)(access_token[\s:=]+[^\s]+)'
-    ]
-    for pat in patterns:
-        text = re.sub(pat, r'***REDACTED***', text)
-    return text
-
-
 def bedrock_summarize_error(runtime, error_message):
-    error_message = redact_secrets(error_message)
+
     return "test summary"
     model_id = "openai.gpt-oss-120b-1:0"   # example
     prompt = (
@@ -152,7 +139,7 @@ def bedrock_summarize_error(runtime, error_message):
 
 
 def bedrock_suggest_solution(runtime, error_message):
-    error_message = redact_secrets(error_message)
+
     return "test solution"
     model_id = "openai.gpt-oss-120b-1:0"   # example
     prompt = (
@@ -186,7 +173,7 @@ def create_aggregated_github_issue(repo, token, all_failures, env, collection_na
         job_url = fail.get('job_url', '')
         issue_url = fail.get('issue_url', '')
         test_type = fail.get('test_type', '')
-        summary = redact_secrets(fail.get('summary', ''))
+        summary = fail.get('summary', '')
         short_name = collection_names.get(concept_id, 'Unknown Collection')
         # Ensure links are valid URLs or empty
         job_url_str = f"[regression]({job_url})" if job_url and job_url.startswith('http') else ''
@@ -308,7 +295,7 @@ def main():
                         error_sections.append(section)
                         issue_url = None
                         if repo and token:
-                            title = f"Regression Failure: {data.get('env', '')} {data.get('file', '')}"
+                            title = f"Regression Failure: {env} {data.get('file', '')}"
                             body_md = (
                                 f"Job URL: {url}\n\n" + section
                             )
