@@ -51,9 +51,27 @@ jobs:
         run: |
           shopt -s nullglob
           files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
+          
+          files = (
+            "C1261072650-POCLOUD"
+          )
           total=${#files[@]}
-          chunk_size=250
+          max_chunk_size=250
           num_chunks=5
+
+          # Compute dynamic chunk size
+          chunk_size=$(( (total + num_chunks - 1) / num_chunks ))
+
+          # Enforce the maximum
+          if (( chunk_size > max_chunk_size )); then
+            chunk_size=$max_chunk_size
+            # Recalculate how many chunks we actually need
+            num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
+          fi
+
+          echo "Total files: $total"
+          echo "Chunk size: $chunk_size"
+          echo "Chunks: $num_chunks"
 
           for i in $(seq 0 $((num_chunks - 1))); do
             [ $i -ge 5 ] && break
