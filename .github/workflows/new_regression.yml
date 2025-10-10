@@ -21,16 +21,20 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.set-env.outputs.environment }}
+      environment_upper: ${{ steps.set-env.outputs.environment_upper }}
     steps:
       - id: set-env
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+            ENV="${{ inputs.environment }}"
           elif [ "${{ github.event.schedule }}" = "0 8 * * *" ]; then
-            echo "environment=ops" >> "$GITHUB_OUTPUT"
+            ENV="ops"
           else
-            echo "environment=uat" >> "$GITHUB_OUTPUT"
+            ENV="uat"
           fi
+          
+          echo "environment=$ENV" >> "$GITHUB_OUTPUT"
+          echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
 
   generate-chunks:
     needs: determine-environment
@@ -133,15 +137,15 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets[format('AWS_ACCESS_KEY_ID_SERVICES_{0}', upper(needs.determine-environment.outputs.environment))] }}
-          aws-secret-access-key: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_SERVICES_{0}', upper(needs.determine-environment.outputs.environment))] }}
+          aws-access-key-id: ${{ secrets[format('AWS_ACCESS_KEY_ID_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
+          aws-secret-access-key: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
           aws-region: us-west-2
 
       - name: Aggregate failed jobs and print URLs and reasons
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          REGRESSION_ENV: ${{ upper(needs.determine-environment.outputs.environment) }}
+          REGRESSION_ENV: ${{ needs.determine-environment.outputs.environment_upper }}
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
