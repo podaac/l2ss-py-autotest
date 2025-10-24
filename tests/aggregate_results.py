@@ -187,9 +187,6 @@ def bedrock_summarize_error_anthropic(runtime, error_message):
     # Remove any <reasoning>…</reasoning> tags (Claude sometimes adds them)
     clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
     clean_answer = clean_answer.splitlines()[0]
-    print("#######################")
-    print(clean_answer)
-    print("#######################")
     return clean_answer
 
 
@@ -251,9 +248,6 @@ def bedrock_suggest_solution_anthropic(runtime, error_message):
     # Remove any <reasoning>…</reasoning> tags (Claude sometimes adds them)
     clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
     clean_answer = clean_answer.splitlines()[0]
-    print("#######################")
-    print(clean_answer)
-    print("#######################")
     return clean_answer
 
 
@@ -273,7 +267,45 @@ def create_aggregated_github_issue(repo, token, all_failures, env, collection_na
         line = f"- `{concept_id}` ({short_name}) -- {test_type} -- {job_url_str} {issue_url_str} {summary}".strip()
         body_lines.append(line)
     body = "\n".join(body_lines)
-    create_or_update_github_issue(repo, token, title, body, labels=["regression-failure", "aggregated"])
+    create_or_update_github_issue(repo, token, title, body, labels=["regression-aggregated"])
+
+
+def get_all_regression_failure_issues(repo, token, state="open", max_pages=10):
+    """
+    Fetch all issues with the label 'regression-failure' from the given repo.
+    :param repo: GitHub repo in 'owner/repo' format
+    :param token: GitHub token
+    :param state: 'open', 'closed', or 'all' (default)
+    :param max_pages: Max number of pages to fetch (pagination)
+    :return: List of issues with the label 'regression-failure'
+    """
+    url = f"https://api.github.com/repos/{repo}/issues"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github+json"
+    }
+    issues = []
+    page = 1
+    while page <= max_pages:
+        params = {
+            "state": state,
+            "labels": "regression-failure",
+            "per_page": 100,
+            "page": page
+        }
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        if response.status_code == 200:
+            page_issues = response.json()
+            if not page_issues:
+                break
+            issues.extend(page_issues)
+            if len(page_issues) < 100:
+                break  # Last page
+            page += 1
+        else:
+            print(f"Failed to fetch regression-failure issues (page {page}): {response.status_code}\n{response.text}")
+            break
+    return issues
 
 
 def get_collection_names(providers, env, collections_list):
@@ -390,6 +422,7 @@ def main():
     runtime = boto3.client(service_name="bedrock-runtime", region_name="us-west-2", config=retry_config)
 
     all_failures = []
+    failure_issue_numbers = []
     for fpath in job_status_files:
         with open(fpath) as f:
             data = json.load(f)
@@ -434,6 +467,9 @@ def main():
                                 issue = get_github_issue_by_title(repo, token, title)
                             if issue:
                                 issue_url = issue.get('html_url')
+                                issue_number = issue.get('number')
+                                if issue_number is not None:
+                                    failure_issue_numbers.append(issue_number)
 
                         concept_id = fail.get('concept_id', '')
                         if concept_id not in collection_concept_id:

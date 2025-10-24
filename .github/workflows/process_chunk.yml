@@ -36,36 +36,52 @@ jobs:
           
           # Retry logic to find job URL (may take a moment for API to register)
           MAX_RETRIES=5
-          RETRY_DELAY=5
+          RETRY_DELAY=10
+          PER_PAGE=100
           MATRIX_JOB_URL=""
           
           for attempt in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $attempt/$MAX_RETRIES..."
-            
-            JOBS_DATA=$(curl -s \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs")
-            
-            MATRIX_JOB_URL=$(echo "$JOBS_DATA" | jq -r \
-              --arg env "${{ matrix.env }}" \
-              --arg file "${{ matrix.file }}" \
-              '.jobs[] | select(.name | endswith("process (\($env), \($file))")) | .html_url')
-            
-            if [ -n "$MATRIX_JOB_URL" ]; then
-              echo "Found job URL: $MATRIX_JOB_URL"
-              break
-            fi
-            
-            if [ $attempt -lt $MAX_RETRIES ]; then
-              echo "Job not found yet, waiting ${RETRY_DELAY}s before retry..."
-              sleep $RETRY_DELAY
+
+            PAGE=1
+            FOUND_URL=""
+
+            while : ; do
+              echo "  Fetching jobs page $PAGE..."
+
+              RESPONSE=$(curl -s \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=$PER_PAGE&page=$PAGE")
+
+              MATRIX_JOB_URL=$(echo "$RESPONSE" | jq -r \
+                --arg env "${{ matrix.env }}" \
+                --arg file "${{ matrix.file }}" \
+                '.jobs[] | select(.name | endswith("process (\($env), \($file))")) | .html_url')
+
+              if [ -n "$MATRIX_JOB_URL" ]; then
+                FOUND_URL="$MATRIX_JOB_URL"
+                echo "✅ Found job URL: $FOUND_URL"
+                break 2  # Break BOTH loops
+              fi
+
+              # check if this page was short → no more pages
+              COUNT=$(echo "$RESPONSE" | jq '.jobs | length')
+              if [ "$COUNT" -lt "$PER_PAGE" ]; then
+                echo "  No more job pages on this attempt."
+                break
+              fi
+
+              PAGE=$((PAGE+1))
+            done
+
+            if [ -z "$FOUND_URL" ]; then
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                echo "⏳ Job not found yet, waiting ${RETRY_DELAY}s before retry..."
+                sleep $RETRY_DELAY
+              fi
             fi
           done
-          
-          if [ -z "$MATRIX_JOB_URL" ]; then
-            echo "Job URL: Not available after $MAX_RETRIES attempts"
-          fi
           
           echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
 
