@@ -52,21 +52,21 @@ jobs:
           shopt -s nullglob
           files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
           #files=("tests/cmr/l2ss-py/uat/C1261072650-POCLOUD")
-          #total=${#files[@]}
+          total=${#files[@]}
 
           # Load all files into array
-          files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
+          #files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
 
           # Total number of files
-          total=${#files[@]}
+          #total=${#files[@]}
 
           # Take 1/4 of them (rounding up)
-          quarter=$(( (total + 3) / 4 ))
+          #quarter=$(( (total + 3) / 4 ))
 
           # Slice the array to only keep the first quarter
-          files=("${files[@]:0:quarter}")
+          #files=("${files[@]:0:quarter}")
 
-          total=${#files[@]}
+          #total=${#files[@]}
 
           max_chunk_size=250
           num_chunks=5
