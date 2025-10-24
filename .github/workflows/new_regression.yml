@@ -18,45 +18,45 @@ on:
 
 jobs:
   determine-environment:
-  runs-on: ubuntu-latest
-  outputs:
-    environment: ${{ steps.set-env.outputs.environment }}
-    environment_upper: ${{ steps.set-env.outputs.environment_upper }}
-    bearer_token: ${{ steps.get-token.outputs.token }}
-  steps:
-    - uses: actions/checkout@v3
-    
-    - id: set-env
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          ENV="${{ inputs.environment }}"
-        elif [ "${{ github.event.schedule }}" = "0 8 */3 * *" ]; then
-          ENV="ops"
-        else
-          ENV="uat"
-        fi
-        
-        echo "environment=$ENV" >> "$GITHUB_OUTPUT"
-        echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-    
-    - name: Install dependencies
-      run: pip install requests
-    
-    - id: get-token
-      name: Get CMR Bearer Token
-      env:
-        CMR_USER: ${{ secrets.CMR_USER }}
-        CMR_PASS: ${{ secrets.CMR_PASS }}
-      run: |
-        TOKEN=$(python get_cmr_token.py ${{ steps.set-env.outputs.environment }})
-        echo "::add-mask::$TOKEN"
-        echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
-        echo "CMR_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      environment_upper: ${{ steps.set-env.outputs.environment_upper }}
+      bearer_token: ${{ steps.get-token.outputs.token }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ inputs.environment }}"
+          elif [ "${{ github.event.schedule }}" = "0 8 */3 * *" ]; then
+            ENV="ops"
+          else
+            ENV="uat"
+          fi
+          
+          echo "environment=$ENV" >> "$GITHUB_OUTPUT"
+          echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - id: get-token
+        name: Get CMR Bearer Token
+        env:
+          CMR_USER: ${{ secrets.CMR_USER }}
+          CMR_PASS: ${{ secrets.CMR_PASS }}
+        run: |
+          TOKEN=$(python get_cmr_token.py ${{ steps.set-env.outputs.environment }})
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "CMR_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
   generate-chunks:
     needs: determine-environment
