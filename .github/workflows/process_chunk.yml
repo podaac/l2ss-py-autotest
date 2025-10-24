@@ -10,6 +10,9 @@ on:
         required: false
         type: number
         default: 2    
+      cmr-bearer-token:
+        required: false
+        type: string
     secrets:
       CMR_USER:
         required: true
@@ -24,6 +27,7 @@ jobs:
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
       CMR_PASS: ${{ secrets.CMR_PASS }}
+      CMR_BEARER_TOKEN: ${{ inputs.cmr-bearer-token }}
     strategy:
       max-parallel: ${{ inputs.max-parallel }}
       fail-fast: false

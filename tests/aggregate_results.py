@@ -11,6 +11,11 @@ from botocore.config import Config
 
 def bearer_token(env):
 
+    # Try to get token from environment variable first
+    token = os.environ.get("CMR_BEARER_TOKEN")
+    if token:
+        return token
+
     env = env.lower()
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
 
@@ -251,9 +256,6 @@ def bedrock_suggest_solution_anthropic(runtime, error_message):
     # Remove any <reasoning>…</reasoning> tags (Claude sometimes adds them)
     clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
     clean_answer = clean_answer.splitlines()[0]
-    print("#######################")
-    print(clean_answer)
-    print("#######################")
     return clean_answer
 
 

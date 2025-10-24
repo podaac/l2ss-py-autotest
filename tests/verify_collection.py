@@ -79,25 +79,22 @@ def skip_spatial(env):
 
 @pytest.fixture(scope="session")
 def bearer_token(env: str, request_session: requests.Session) -> str:
+    # Try to get token from environment variable first
+    token = os.environ.get("CMR_BEARER_TOKEN")
+    if token:
+        return token
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
-
     try:
-        # Make the request with the Base64-encoded Authorization header
         resp = request_session.post(
             url,
             auth=HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS'])
         )
-
-        # Check for successful response
         if resp.status_code == 200:
             response_content = resp.json()
             return response_content.get('access_token')
-
     except Exception as e:
         logging.warning(f"Error getting the token (status code {resp.status_code}): {e}", exc_info=True)
-
-    # Skip the test if no token is found
-    pytest.fail("Unable to get bearer token from EDL")
+    pytest.fail("Unable to get bearer token from EDL or environment variable")
 
 
 @pytest.fixture(scope="function")

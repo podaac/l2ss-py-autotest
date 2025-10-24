@@ -18,23 +18,45 @@ on:
 
 jobs:
   determine-environment:
-    runs-on: ubuntu-latest
-    outputs:
-      environment: ${{ steps.set-env.outputs.environment }}
-      environment_upper: ${{ steps.set-env.outputs.environment_upper }}
-    steps:
-      - id: set-env
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ENV="${{ inputs.environment }}"
-          elif [ "${{ github.event.schedule }}" = "0 8 */3 * *" ]; then
-            ENV="ops"
-          else
-            ENV="uat"
-          fi
-          
-          echo "environment=$ENV" >> "$GITHUB_OUTPUT"
-          echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
+  runs-on: ubuntu-latest
+  outputs:
+    environment: ${{ steps.set-env.outputs.environment }}
+    environment_upper: ${{ steps.set-env.outputs.environment_upper }}
+    bearer_token: ${{ steps.get-token.outputs.token }}
+  steps:
+    - uses: actions/checkout@v3
+    
+    - id: set-env
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          ENV="${{ inputs.environment }}"
+        elif [ "${{ github.event.schedule }}" = "0 8 */3 * *" ]; then
+          ENV="ops"
+        else
+          ENV="uat"
+        fi
+        
+        echo "environment=$ENV" >> "$GITHUB_OUTPUT"
+        echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: pip install requests
+    
+    - id: get-token
+      name: Get CMR Bearer Token
+      env:
+        CMR_USER: ${{ secrets.CMR_USER }}
+        CMR_PASS: ${{ secrets.CMR_PASS }}
+      run: |
+        TOKEN=$(python get_cmr_token.py ${{ steps.set-env.outputs.environment }})
+        echo "::add-mask::$TOKEN"
+        echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+        echo "CMR_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
   generate-chunks:
     needs: determine-environment
@@ -111,7 +133,8 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
-
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
+  
   process-chunk-2:
     needs: [determine-environment, generate-chunks]
     if: needs.generate-chunks.outputs.chunk2 != ''
@@ -119,6 +142,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
 
   process-chunk-3:
     needs: [determine-environment, generate-chunks]
@@ -127,6 +151,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
 
   process-chunk-4:
     needs: [determine-environment, generate-chunks]
@@ -135,6 +160,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
 
   process-chunk-5:
     needs: [determine-environment, generate-chunks]
@@ -143,6 +169,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
 
   aggregate-failures:
     needs:
