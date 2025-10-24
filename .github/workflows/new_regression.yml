@@ -1,34 +1,43 @@
-name: Parallel Jobs per File (ops + uat with env)
+name: Parallel Jobs per File (OPS & UAT)
 
 on:
+  schedule:
+    # Run OPS every 3 days at midnight PST (8 AM UTC)
+    - cron: '0 8 */3 * *'
+    # Run UAT every 3 days at 1 AM PST (9 AM UTC)
+    - cron: '0 9 */3 * *'
   workflow_dispatch:
-
-# YAML anchors to reduce duplication
-x-chunk-job: &chunk-job
-  runs-on: ubuntu-latest
-  env:
-    CMR_USER: ${{ secrets.CMR_USER }}
-    CMR_PASS: ${{ secrets.CMR_PASS }}
-  strategy:
-    max-parallel: 3
-    fail-fast: false
-  steps:
-    - name: Print env and file
-      run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-    - uses: abatilo/actions-poetry@v3
-      with:
-        poetry-version: 2.1.3
-    - run: poetry install
-    - name: Run Regression
-      working-directory: tests
-      run: poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        type: choice
+        options:
+          - ops
+          - uat
 
 jobs:
+  determine-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      environment_upper: ${{ steps.set-env.outputs.environment_upper }}
+    steps:
+      - id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ inputs.environment }}"
+          elif [ "${{ github.event.schedule }}" = "0 8 */3 * *" ]; then
+            ENV="ops"
+          else
+            ENV="uat"
+          fi
+          
+          echo "environment=$ENV" >> "$GITHUB_OUTPUT"
+          echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
+
   generate-chunks:
+    needs: determine-environment
     runs-on: ubuntu-latest
     outputs:
       chunk1: ${{ steps.set.outputs.chunk1 }}
@@ -41,15 +50,29 @@ jobs:
       - id: set
         run: |
           shopt -s nullglob
-          files=(tests/cmr/l2ss-py/ops/* tests/cmr/l2ss-py/uat/*)
-          total=${#files[@]}
-          chunk_size=250  # Stay under 256 matrix limit
-          chunk_size=3
-
-          num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
+          files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
           
+          files=("tests/cmr/l2ss-py/uat/C1261072650-POCLOUD")
+          total=${#files[@]}
+          max_chunk_size=250
+          num_chunks=5
+
+          # Compute dynamic chunk size
+          chunk_size=$(( (total + num_chunks - 1) / num_chunks ))
+
+          # Enforce the maximum
+          if (( chunk_size > max_chunk_size )); then
+            chunk_size=$max_chunk_size
+            # Recalculate how many chunks we actually need
+            num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
+          fi
+
+          echo "Total files: $total"
+          echo "Chunk size: $chunk_size"
+          echo "Chunks: $num_chunks"
+
           for i in $(seq 0 $((num_chunks - 1))); do
-            [ $i -ge 5 ] && break  # Max 5 chunks
+            [ $i -ge 5 ] && break
             
             start=$((i * chunk_size))
             chunk=("${files[@]:start:chunk_size}")
@@ -68,46 +91,92 @@ jobs:
           done
 
   process-chunk-1:
-    <<: *chunk-job
-    needs: generate-chunks
+    needs: [determine-environment, generate-chunks]
     if: needs.generate-chunks.outputs.chunk1 != ''
-    strategy:
-      max-parallel: 3
-      fail-fast: false
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk1) }}
+    uses: ./.github/workflows/process_chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
 
   process-chunk-2:
-    <<: *chunk-job
-    needs: generate-chunks
+    needs: [determine-environment, generate-chunks]
     if: needs.generate-chunks.outputs.chunk2 != ''
-    strategy:
-      max-parallel: 3
-      fail-fast: false
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk2) }}
+    uses: ./.github/workflows/process_chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
 
   process-chunk-3:
-    <<: *chunk-job
-    needs: generate-chunks
+    needs: [determine-environment, generate-chunks]
     if: needs.generate-chunks.outputs.chunk3 != ''
-    strategy:
-      max-parallel: 3
-      fail-fast: false
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk3) }}
+    uses: ./.github/workflows/process_chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
 
   process-chunk-4:
-    <<: *chunk-job
-    needs: generate-chunks
+    needs: [determine-environment, generate-chunks]
     if: needs.generate-chunks.outputs.chunk4 != ''
-    strategy:
-      max-parallel: 3
-      fail-fast: false
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk4) }}
+    uses: ./.github/workflows/process_chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
 
   process-chunk-5:
-    <<: *chunk-job
-    needs: generate-chunks
+    needs: [determine-environment, generate-chunks]
     if: needs.generate-chunks.outputs.chunk5 != ''
-    strategy:
-      max-parallel: 3
-      fail-fast: false
-      matrix: ${{ fromJson(needs.generate-chunks.outputs.chunk5) }}
+    uses: ./.github/workflows/process_chunk.yml
+    secrets: inherit
+    with:
+      chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
+
+  aggregate-failures:
+    needs:
+      - determine-environment
+      - process-chunk-1
+      - process-chunk-2
+      - process-chunk-3
+      - process-chunk-4
+      - process-chunk-5
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download all job status artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: job-status-*
+          path: job-status
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets[format('AWS_ACCESS_KEY_ID_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
+          aws-secret-access-key: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
+          aws-region: us-west-2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets[format('AWS_ACCESS_KEY_ID_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
+          aws-secret-access-key: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
+          aws-region: us-west-2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PERSONAL_JAMESFWOOD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PERSONAL_JAMESFWOOD }}
+          aws-region: us-west-2
+
+      - name: Aggregate failed jobs and print URLs and reasons
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          REGRESSION_ENV: ${{ needs.determine-environment.outputs.environment_upper }}
+          CMR_USER: ${{ secrets.CMR_USER }}
+          CMR_PASS: ${{ secrets.CMR_PASS }}
+        run: |
+          python3 tests/aggregate_results.py
