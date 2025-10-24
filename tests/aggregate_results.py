@@ -509,7 +509,7 @@ def main():
                 title = f"Regression Failure: {env} | {concept_id} | {short_name}"
                 create_or_update_github_issue(repo, token, title, body_md, labels=["regression-failure"])
 
-    for number in old_issue_numbers
+    for number in old_issue_numbers:
         if number not in failure_issue_numbers:
             url = f"https://api.github.com/repos/{repo}/issues/{number}"
             headers = {
