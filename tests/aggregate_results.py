@@ -187,6 +187,9 @@ def bedrock_summarize_error_anthropic(runtime, error_message):
     # Remove any <reasoning>…</reasoning> tags (Claude sometimes adds them)
     clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
     clean_answer = clean_answer.splitlines()[0]
+    print("#######################")
+    print(clean_answer)
+    print("#######################")
     return clean_answer
 
 
@@ -248,6 +251,9 @@ def bedrock_suggest_solution_anthropic(runtime, error_message):
     # Remove any <reasoning>…</reasoning> tags (Claude sometimes adds them)
     clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
     clean_answer = clean_answer.splitlines()[0]
+    print("#######################")
+    print(clean_answer)
+    print("#######################")
     return clean_answer
 
 
@@ -421,6 +427,9 @@ def main():
 
     runtime = boto3.client(service_name="bedrock-runtime", region_name="us-west-2", config=retry_config)
 
+    old_issues = get_all_regression_failure_issues(repo, token)
+    old_issue_numbers = [issue["number"] for issue in old_issues]
+
     all_failures = []
     failure_issue_numbers = []
     for fpath in job_status_files:
@@ -499,7 +508,21 @@ def main():
                 short_name = collection_names.get(concept_id, 'Unknown Collection')
                 title = f"Regression Failure: {env} | {concept_id} | {short_name}"
                 create_or_update_github_issue(repo, token, title, body_md, labels=["regression-failure"])
-    
+
+    for number in old_issue_numbers
+        if number not in failure_issue_numbers:
+            url = f"https://api.github.com/repos/{repo}/issues/{number}"
+            headers = {
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json"
+            }
+            data = {"state": "closed"}
+            response = requests.patch(url, headers=headers, json=data)
+            if response.status_code == 200:
+                print(f"Closed issue number: {number}")
+            else:
+                print(f"Failed to close issue number: {number} (status {response.status_code})\n{response.text}")
+
     if all_failures and repo and token:
         create_aggregated_github_issue(repo, token, all_failures, env, collection_names)
     if not failed:
