@@ -108,6 +108,11 @@ jobs:
       - name: Poetry Install
         run: poetry install
 
+      - name: Print Token
+        working-directory: tests
+        run: |
+          python environ.py
+
       - name: Run Regression
         id: regression
         working-directory: tests
