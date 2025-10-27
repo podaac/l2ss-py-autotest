@@ -129,7 +129,7 @@ jobs:
             [ ${#chunk[@]} -eq 0 ] && continue
             
             json=$(printf '%s\n' "${chunk[@]}" \
-              | jq -R --arg token "$token" 'split("/") | {env: .[-2], file: .[-1], urs_token: $urs_token}' \
+              | jq -R --arg urs_token "$urs_token" 'split("/") | {env: .[-2], file: .[-1], urs_token: $urs_token}' \
               | jq -s '{include: .}')
             
             {
