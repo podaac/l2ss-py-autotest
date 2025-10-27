@@ -106,6 +106,8 @@ def main():
         token = get_bearer_token(env)
         # Print token to stdout (can be captured in GitHub Actions)
         print(token)
+        logging.info(token)
+        logging.info("Token printed")
         sys.exit(0)
         
     except ValueError as e:
