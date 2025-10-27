@@ -62,7 +62,6 @@ jobs:
       - name: Debug - Verify token output
         run: |
           echo "Token from step output: '${{ steps.get-token.outputs.urs_token }}'"
-          echo "Token length: ${{ length(steps.get-token.outputs.urs_token) }}"
           echo "Token is set: ${{ steps.get-token.outputs.urs_token != '' }}"
 
   generate-chunks:
