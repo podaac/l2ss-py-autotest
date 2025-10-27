@@ -86,7 +86,7 @@ jobs:
           echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
 
       - name: Print env and file
-        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }} token =${{ matrix.urs_token }}"
+        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }} token=${{ matrix.urs_token }}"
 
       - name: Checkout Repository
         uses: actions/checkout@v4
