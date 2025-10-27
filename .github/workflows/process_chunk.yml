@@ -112,7 +112,10 @@ jobs:
         id: regression
         working-directory: tests
         run: |
-          poetry run pytest -n 2 verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }} --tb=short | tee ../pytest_output.log
+          poetry run pytest -s -n 2 verify_collection.py \
+            --env ${{ matrix.env }} \
+            --concept_id ${{ matrix.file }} \
+            --tb=short | tee ../pytest_output.log
 
       - name: Save job status, URL, and regression results
         working-directory: tests
