@@ -55,8 +55,7 @@ jobs:
           CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
           TOKEN=$(python get_cmr_token.py ${{ steps.set-env.outputs.environment }})
-          echo "UNMASKED TOKEN: $TOKEN"
-          # echo "::add-mask::$TOKEN"
+          echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
           echo "CMR_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 

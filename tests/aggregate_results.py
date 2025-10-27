@@ -16,6 +16,7 @@ def bearer_token(env):
     if token:
         return token
 
+    print("TOKEN not found in os environment getting token via api")
     env = env.lower()
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
 
