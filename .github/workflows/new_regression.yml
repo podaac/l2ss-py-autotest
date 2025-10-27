@@ -64,6 +64,11 @@ jobs:
           echo "Token from step output: '${{ steps.get-token.outputs.urs_token }}'"
           echo "Token is set: ${{ steps.get-token.outputs.urs_token != '' }}"
 
+          TOKEN="${{ steps.get-token.outputs.urs_token }}"
+          echo "Token length: ${#TOKEN}"
+          echo "Token first 10 char: ${TOKEN:0:10}"
+
+
   generate-chunks:
     needs: determine-environment
     runs-on: ubuntu-latest
