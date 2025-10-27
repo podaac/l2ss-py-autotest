@@ -9,9 +9,7 @@ on:
       max-parallel:
         required: false
         type: number
-        default: 2    
-      cmr-bearer-token:
-        required: false
+        default: 2
     secrets:
       CMR_USER:
         required: true
@@ -26,7 +24,6 @@ jobs:
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
       CMR_PASS: ${{ secrets.CMR_PASS }}
-      CMR_BEARER_TOKEN: ${{ inputs.cmr-bearer-token }}
     strategy:
       max-parallel: ${{ inputs.max-parallel }}
       fail-fast: false
@@ -112,8 +109,21 @@ jobs:
         run: |
           python -u environ.py
 
+      - name: Check CMR_BEARER_TOKEN
+        run: |
+          if [ -z "$CMR_BEARER_TOKEN" ]; then
+            echo "❌ CMR_BEARER_TOKEN is not set!"
+            exit 1
+          else
+            echo "✅ CMR_BEARER_TOKEN is set (length: ${#CMR_BEARER_TOKEN})"
+          fi
+        env:
+          CMR_BEARER_TOKEN: ${{ matrix.urs_token }}
+
       - name: Run Regression
         id: regression
+        env: 
+          CMR_BEARER_TOKEN: ${{ matrix.urs_token }}
         working-directory: tests
         run: |
           poetry run pytest -s -n 2 verify_collection.py \

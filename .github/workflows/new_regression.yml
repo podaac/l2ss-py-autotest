@@ -118,6 +118,8 @@ jobs:
           echo "Chunk size: $chunk_size"
           echo "Chunks: $num_chunks"
 
+          urs_token="${{ needs.determine-environment.outputs.urs_token }}"
+
           for i in $(seq 0 $((num_chunks - 1))); do
             [ $i -ge 5 ] && break
             
@@ -127,7 +129,7 @@ jobs:
             [ ${#chunk[@]} -eq 0 ] && continue
             
             json=$(printf '%s\n' "${chunk[@]}" \
-              | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
+              | jq -R --arg token "$token" 'split("/") | {env: .[-2], file: .[-1], urs_token: $urs_token}' \
               | jq -s '{include: .}')
             
             {
