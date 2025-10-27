@@ -49,6 +49,7 @@ jobs:
       
       - id: get-token
         name: Get CMR Bearer Token
+        working-directory: tests
         env:
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
