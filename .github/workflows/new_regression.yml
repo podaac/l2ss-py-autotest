@@ -47,39 +47,8 @@ jobs:
       chunk3: ${{ steps.set.outputs.chunk3 }}
       chunk4: ${{ steps.set.outputs.chunk4 }}
       chunk5: ${{ steps.set.outputs.chunk5 }}
-      urs_token: ${{ steps.get-token.outputs.urs_token }}      
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      
-      - name: Install dependencies
-        run: pip install requests
-
-      - id: get-token
-        name: Get CMR Bearer Token
-        working-directory: tests
-        env:
-          CMR_USER: ${{ secrets.CMR_USER }}
-          CMR_PASS: ${{ secrets.CMR_PASS }}
-          ENVIRONMENT: ${{ needs.determine-environment.outputs.environment }}
-        run: |
-          echo "Using environment: $ENVIRONMENT"
-          URS_TOKEN=$(python get_cmr_token.py "$ENVIRONMENT")
-          echo "urs_token=$URS_TOKEN" >> "$GITHUB_OUTPUT"
-
-      - name: Debug - Verify token output
-        run: |
-          echo "Token from step output: '${{ steps.get-token.outputs.urs_token }}'"
-          echo "Token is set: ${{ steps.get-token.outputs.urs_token != '' }}"
-
-          TOKEN="${{ steps.get-token.outputs.urs_token }}"
-          echo "Token length: ${#TOKEN}"
-          echo "Token first 10 char: ${TOKEN:0:10}"
-
       - id: set
         run: |
           shopt -s nullglob
@@ -118,8 +87,6 @@ jobs:
           echo "Chunk size: $chunk_size"
           echo "Chunks: $num_chunks"
 
-          urs_token="${{ steps.get-token.outputs.urs_token }}"
-
           for i in $(seq 0 $((num_chunks - 1))); do
             [ $i -ge 5 ] && break
             
@@ -129,9 +96,8 @@ jobs:
             [ ${#chunk[@]} -eq 0 ] && continue
             
             json=$(printf '%s\n' "${chunk[@]}" \
-              | jq -R --arg urs_token "$urs_token" 'split("/") | {env: .[-2], file: .[-1], urs_token: $urs_token}' \
+              | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
               | jq -s '{include: .}')
-            
             {
               echo "chunk$((i+1))<<EOF"
               echo "$json"
@@ -146,6 +112,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
+      environment: ${{ needs.determine-environment.outputs.environment }}
   
   process-chunk-2:
     needs: [determine-environment, generate-chunks]
@@ -154,6 +121,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
+      environment: ${{ needs.determine-environment.outputs.environment }}
 
   process-chunk-3:
     needs: [determine-environment, generate-chunks]
@@ -162,6 +130,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
+      environment: ${{ needs.determine-environment.outputs.environment }}
 
   process-chunk-4:
     needs: [determine-environment, generate-chunks]
@@ -170,6 +139,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
+      environment: ${{ needs.determine-environment.outputs.environment }}
 
   process-chunk-5:
     needs: [determine-environment, generate-chunks]
@@ -178,6 +148,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
+      environment: ${{ needs.determine-environment.outputs.environment }}
 
   aggregate-failures:
     needs:

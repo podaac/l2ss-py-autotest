@@ -10,6 +10,9 @@ on:
         required: false
         type: number
         default: 2
+      environment:
+        required: true
+        type: string
     secrets:
       CMR_USER:
         required: true
@@ -19,7 +22,45 @@ permissions:
   actions: read   # needed to query jobs API
   contents: read  # optional, if accessing repo files
 jobs:
+  cmr_token:
+    runs-on: ubuntu-latest
+    env:
+      CMR_USER: ${{ secrets.CMR_USER }}
+      CMR_PASS: ${{ secrets.CMR_PASS }}
+    outputs:
+      urs_token: ${{ steps.get-token.outputs.urs_token }}
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: pip install requests
+
+      - id: get-token
+        name: Get CMR Bearer Token
+        working-directory: tests
+        env:
+          CMR_USER: ${{ secrets.CMR_USER }}
+          CMR_PASS: ${{ secrets.CMR_PASS }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          echo "Using environment: $ENVIRONMENT"
+          URS_TOKEN=$(python get_cmr_token.py "$ENVIRONMENT")
+          echo "urs_token=$URS_TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Debug - Verify token output
+        run: |
+          echo "Token from step output: '${{ steps.get-token.outputs.urs_token }}'"
+          echo "Token is set: ${{ steps.get-token.outputs.urs_token != '' }}"
+
+          TOKEN="${{ steps.get-token.outputs.urs_token }}"
+          echo "Token length: ${#TOKEN}"
+          echo "Token first 10 char: ${TOKEN:0:10}"
+
   process:
+    needs: cmr_token    
     runs-on: ubuntu-latest
     env:
       CMR_USER: ${{ secrets.CMR_USER }}
@@ -86,7 +127,7 @@ jobs:
           echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
 
       - name: Print env and file
-        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }} token=${{ matrix.urs_token }}"
+        run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -105,13 +146,15 @@ jobs:
         run: poetry install
 
       - name: Print Token
+        env:
+          CMR_BEARER_TOKEN: ${{ needs.cmr_token.outputs.urs_token }}
         working-directory: tests
         run: |
           python -u environ.py
 
       - name: Check CMR_BEARER_TOKEN
         env:
-          CMR_BEARER_TOKEN: ${{ matrix.urs_token }}
+          CMR_BEARER_TOKEN: ${{ needs.cmr_token.outputs.urs_token }}
         run: |
           if [ -z "$CMR_BEARER_TOKEN" ]; then
             echo "❌ CMR_BEARER_TOKEN is not set!"
