@@ -30,6 +30,8 @@ jobs:
     outputs:
       urs_token: ${{ steps.get-token.outputs.urs_token }}
     steps:
+      - uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
