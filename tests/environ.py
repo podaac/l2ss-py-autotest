@@ -3,8 +3,6 @@
 import os
 import sys
 import logging
-import requests
-from requests.auth import HTTPBasicAuth
 
 # Configure logging to stderr so it appears in GitHub Actions logs
 logging.basicConfig(
