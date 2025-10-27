@@ -6,7 +6,7 @@ Usage:
     python get_cmr_token.py <env>
     
 Arguments:
-    env: Environment to use ('uat' or 'prod')
+    env: Environment to use ('uat' or 'ops')
     
 Environment Variables:
     CMR_BEARER_TOKEN: Optional cached token (checked first)
@@ -14,7 +14,7 @@ Environment Variables:
     CMR_PASS: Required password for EDL authentication
     
 Examples:
-    python get_cmr_token.py prod
+    python get_cmr_token.py ops
     python get_cmr_token.py uat
     
 Exit Codes:
@@ -41,7 +41,7 @@ def get_bearer_token(env: str) -> str:
     Retrieve bearer token for CMR API from cache or EDL.
     
     Args:
-        env: Environment ('uat' or 'prod')
+        env: Environment ('uat' or 'ops')
         
     Returns:
         Bearer token string
@@ -92,14 +92,14 @@ def main():
     # Check command line arguments
     if len(sys.argv) != 2:
         print("Usage: python get_cmr_token.py <env>", file=sys.stderr)
-        print("  env: 'uat' or 'prod'", file=sys.stderr)
+        print("  env: 'uat' or 'ops'", file=sys.stderr)
         sys.exit(1)
     
     env = sys.argv[1].lower()
     
     # Validate environment argument
-    if env not in ('uat', 'prod'):
-        print(f"Error: Invalid environment '{env}'. Must be 'uat' or 'prod'", file=sys.stderr)
+    if env not in ('uat', 'ops'):
+        print(f"Error: Invalid environment '{env}'. Must be 'uat' or 'ops'", file=sys.stderr)
         sys.exit(1)
     
     try:
