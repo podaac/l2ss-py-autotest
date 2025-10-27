@@ -104,9 +104,8 @@ def main():
     
     try:
         token = get_bearer_token(env)
-        print("FAKETOKEN")
         # Print token to stdout (can be captured in GitHub Actions)
-        #print(token)
+        print(token)
         sys.exit(0)
         
     except ValueError as e:
