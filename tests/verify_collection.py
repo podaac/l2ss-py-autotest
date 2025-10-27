@@ -82,7 +82,10 @@ def bearer_token(env: str, request_session: requests.Session) -> str:
     # Try to get token from environment variable first
     token = os.environ.get("CMR_BEARER_TOKEN")
     if token:
+        print("FOUND TOKEN IN Environment")
         return token
+
+    print("NO TOKEN FOUND NOW USING API TO GET TOKEN")
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
     try:
         resp = request_session.post(

@@ -84,7 +84,7 @@ jobs:
           total=${#files[@]}
 
           # Take 1/4 of them (rounding up)
-          quarter=$(( (total + 3) / 8 ))
+          quarter=$(( (total + 3) / 16 ))
 
           # Slice the array to only keep the first quarter
           files=("${files[@]:0:quarter}")
