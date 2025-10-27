@@ -22,7 +22,7 @@ jobs:
     outputs:
       environment: ${{ steps.set-env.outputs.environment }}
       environment_upper: ${{ steps.set-env.outputs.environment_upper }}
-      bearer_token: ${{ steps.get-token.outputs.urs_token }}
+      urs_token: ${{ steps.get-token.outputs.urs_token }}
     steps:
       - uses: actions/checkout@v3
       
@@ -144,7 +144,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
-      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.urs_token }}
   
   process-chunk-2:
     needs: [determine-environment, generate-chunks]
@@ -153,7 +153,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
-      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.urs_token }}
 
   process-chunk-3:
     needs: [determine-environment, generate-chunks]
@@ -162,7 +162,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
-      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.urs_token }}
 
   process-chunk-4:
     needs: [determine-environment, generate-chunks]
@@ -171,7 +171,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
-      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.urs_token }}
 
   process-chunk-5:
     needs: [determine-environment, generate-chunks]
@@ -180,7 +180,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
-      cmr-bearer-token: ${{ needs.determine-environment.outputs.bearer_token }}
+      cmr-bearer-token: ${{ needs.determine-environment.outputs.urs_token }}
 
   aggregate-failures:
     needs:
