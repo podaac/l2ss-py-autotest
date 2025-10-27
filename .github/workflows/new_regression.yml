@@ -22,7 +22,6 @@ jobs:
     outputs:
       environment: ${{ steps.set-env.outputs.environment }}
       environment_upper: ${{ steps.set-env.outputs.environment_upper }}
-      urs_token: ${{ steps.get-token.outputs.urs_token }}
     steps:
       - uses: actions/checkout@v3
       
@@ -38,7 +37,20 @@ jobs:
           
           echo "environment=$ENV" >> "$GITHUB_OUTPUT"
           echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
-      
+
+  generate-chunks:
+    needs: determine-environment
+    runs-on: ubuntu-latest
+    outputs:
+      chunk1: ${{ steps.set.outputs.chunk1 }}
+      chunk2: ${{ steps.set.outputs.chunk2 }}
+      chunk3: ${{ steps.set.outputs.chunk3 }}
+      chunk4: ${{ steps.set.outputs.chunk4 }}
+      chunk5: ${{ steps.set.outputs.chunk5 }}
+      urs_token: ${{ steps.get-token.outputs.urs_token }}      
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -46,14 +58,14 @@ jobs:
       
       - name: Install dependencies
         run: pip install requests
-      
+
       - id: get-token
         name: Get CMR Bearer Token
         working-directory: tests
         env:
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
-          ENVIRONMENT: ${{ steps.set-env.outputs.environment }}
+          ENVIRONMENT: ${{ needs.determine-environment.outputs.environment }}
         run: |
           echo "Using environment: $ENVIRONMENT"
           URS_TOKEN=$(python get_cmr_token.py "$ENVIRONMENT")
@@ -68,18 +80,6 @@ jobs:
           echo "Token length: ${#TOKEN}"
           echo "Token first 10 char: ${TOKEN:0:10}"
 
-
-  generate-chunks:
-    needs: determine-environment
-    runs-on: ubuntu-latest
-    outputs:
-      chunk1: ${{ steps.set.outputs.chunk1 }}
-      chunk2: ${{ steps.set.outputs.chunk2 }}
-      chunk3: ${{ steps.set.outputs.chunk3 }}
-      chunk4: ${{ steps.set.outputs.chunk4 }}
-      chunk5: ${{ steps.set.outputs.chunk5 }}
-    steps:
-      - uses: actions/checkout@v4
       - id: set
         run: |
           shopt -s nullglob
@@ -118,7 +118,7 @@ jobs:
           echo "Chunk size: $chunk_size"
           echo "Chunks: $num_chunks"
 
-          urs_token="${{ needs.determine-environment.outputs.urs_token }}"
+          urs_token="${{ steps.get-token.outputs.urs_token }}"
 
           for i in $(seq 0 $((num_chunks - 1))); do
             [ $i -ge 5 ] && break
