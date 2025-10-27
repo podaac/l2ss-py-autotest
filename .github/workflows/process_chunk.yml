@@ -111,7 +111,7 @@ jobs:
       - name: Print Token
         working-directory: tests
         run: |
-          python environ.py
+          python -u environ.py
 
       - name: Run Regression
         id: regression
