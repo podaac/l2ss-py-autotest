@@ -112,7 +112,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
-      environment: ${{ needs.determine-environment.outputs.environment }}
+      environment: ${{ needs.determine-environment.outputs.environment_upper }}
   
   process-chunk-2:
     needs: [determine-environment, generate-chunks]
@@ -121,7 +121,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
-      environment: ${{ needs.determine-environment.outputs.environment }}
+      environment: ${{ needs.determine-environment.outputs.environment_upper }}
 
   process-chunk-3:
     needs: [determine-environment, generate-chunks]
@@ -130,7 +130,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
-      environment: ${{ needs.determine-environment.outputs.environment }}
+      environment: ${{ needs.determine-environment.outputs.environment_upper }}
 
   process-chunk-4:
     needs: [determine-environment, generate-chunks]
@@ -139,7 +139,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
-      environment: ${{ needs.determine-environment.outputs.environment }}
+      environment: ${{ needs.determine-environment.outputs.environment_upper }}
 
   process-chunk-5:
     needs: [determine-environment, generate-chunks]
@@ -148,7 +148,7 @@ jobs:
     secrets: inherit
     with:
       chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
-      environment: ${{ needs.determine-environment.outputs.environment }}
+      environment: ${{ needs.determine-environment.outputs.environment_upper }}
 
   aggregate-failures:
     needs:
