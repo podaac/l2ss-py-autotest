@@ -48,8 +48,11 @@ jobs:
       chunk4: ${{ steps.set.outputs.chunk4 }}
       chunk5: ${{ steps.set.outputs.chunk5 }}
     steps:
+
       - uses: actions/checkout@v4
-      - id: set
+
+      - name: Chuncking Files
+        id: set
         run: |
           shopt -s nullglob
           files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
@@ -57,18 +60,18 @@ jobs:
           total=${#files[@]}
 
           # Load all files into array
-          files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
+          #files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
 
           # Total number of files
-          total=${#files[@]}
+          #total=${#files[@]}
 
           # Take 1/4 of them (rounding up)
-          quarter=$(( (total + 3) / 16 ))
+          #quarter=$(( (total + 3) / 16 ))
 
           # Slice the array to only keep the first quarter
-          files=("${files[@]:0:quarter}")
+          #files=("${files[@]:0:quarter}")
 
-          total=${#files[@]}
+          #total=${#files[@]}
 
           max_chunk_size=250
           num_chunks=5
