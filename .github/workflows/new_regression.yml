@@ -4,8 +4,8 @@ on:
   schedule:
     # Run OPS every 3 days at midnight PST (8 AM UTC)
     - cron: '0 8 */3 * *'
-    # Run UAT every 3 days at 1 AM PST (9 AM UTC)
-    - cron: '0 9 */3 * *'
+    # Run UAT every 3 days at 4 AM PST (12 PM UTC)
+    - cron: '0 12 */3 * *'
   workflow_dispatch:
     inputs:
       environment:

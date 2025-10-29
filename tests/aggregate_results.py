@@ -8,6 +8,7 @@ import re
 from requests.auth import HTTPBasicAuth
 import textwrap
 from botocore.config import Config
+from datetime import datetime
 
 def bearer_token(env):
 
@@ -135,7 +136,7 @@ def format_message(msg, max_lines=30):
 def bedrock_summarize_error(runtime, error_message):
 
     # return "test summary"
-    model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"   # example
+    model_id="openai.gpt-oss-120b-1:0"
     prompt = (
         "Summarize the following error message in exactly 10 words. "
         "Output ONLY the 10-word summary as plain text. "
@@ -192,16 +193,13 @@ def bedrock_summarize_error_anthropic(runtime, error_message):
     # Remove any <reasoning>…</reasoning> tags (Claude sometimes adds them)
     clean_answer = re.sub(r"<reasoning>.*?</reasoning>", "", raw_answer, flags=re.DOTALL).strip()
     clean_answer = clean_answer.splitlines()[0]
-    print("#######################")
-    print(clean_answer)
-    print("#######################")
     return clean_answer
 
 
 def bedrock_suggest_solution(runtime, error_message):
 
     # return "test solution"
-    model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"   # example
+    model_id="openai.gpt-oss-120b-1:0"
     prompt = (
         "Given the following error message, suggest a possible solution or next step. "
         "Output ONLY the solution as plain text. "
@@ -261,7 +259,13 @@ def bedrock_suggest_solution_anthropic(runtime, error_message):
 
 def create_aggregated_github_issue(repo, token, all_failures, env, collection_names):
     title = f"Aggregated Regression Failures {env}"
-    body_lines = ["# Aggregated Regression Failures\n"]
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    body_lines = [
+        f"**Updated:** {timestamp}\n",
+        f"# Aggregated Regression Failures\n",
+    ]
+
     for fail in all_failures:
         concept_id = fail.get('concept_id', '')
         job_url = fail.get('job_url', '')
@@ -272,7 +276,7 @@ def create_aggregated_github_issue(repo, token, all_failures, env, collection_na
         # Ensure links are valid URLs or empty
         job_url_str = f"[regression]({job_url})" if job_url and job_url.startswith('http') else ''
         issue_url_str = f"[issue]({issue_url})" if issue_url and issue_url.startswith('http') else ''
-        line = f"- `{concept_id}` ({short_name}) -- {test_type} -- {job_url_str} {issue_url_str} {summary}".strip()
+        line = f"- `{concept_id}` ({short_name}) -- {test_type} -- {issue_url_str} {summary}".strip()
         body_lines.append(line)
     body = "\n".join(body_lines)
     create_or_update_github_issue(repo, token, title, body, labels=["regression-aggregated"])
@@ -444,6 +448,8 @@ def main():
             print("REGRESSION RESULTS:")
             try:
                 reason_json = json.loads(reason)
+                timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
                 if isinstance(reason_json, dict) and "failed" in reason_json:
                     error_sections = []
                     for fail in reason_json["failed"]:
@@ -470,7 +476,9 @@ def main():
                         if repo and token:
                             title = f"Regression Failure: {env} | {concept_id} | {short_name}"
                             body_md = (
-                                f"Job URL: {url}\n\n" + section
+                                f"**Updated:** {timestamp}\n\n"
+                                f"Job URL: {url}\n\n"
+                                + section
                             )
                             issue = get_github_issue_by_title(repo, token, title)
                             if not issue:
@@ -495,14 +503,14 @@ def main():
                             'summary': summary
                         })
                     pretty_reason = json.dumps(reason_json, indent=2)
-                    body_md = f"Job URL: {url}\n\nRegression Failures:\n\n" + "\n".join(error_sections)
+                    body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Failures:\n\n" + "\n".join(error_sections)
                 else:
                     pretty_reason = format_message(reason)
-                    body_md = f"Job URL: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
+                    body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
             except Exception as ex:
                 print(ex)
                 pretty_reason = format_message(reason)
-                body_md = f"Job URL: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
+                body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
             print(pretty_reason)
             print("----------------------")
             failed = True
