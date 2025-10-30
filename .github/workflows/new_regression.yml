@@ -1,4 +1,4 @@
-name: Parallel Jobs per File (OPS & UAT)
+name: Regression Parallel Jobs (OPS & UAT)
 
 on:
   schedule:
