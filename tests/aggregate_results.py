@@ -282,7 +282,7 @@ def create_aggregated_github_issue(repo, token, all_failures, env, collection_na
     create_or_update_github_issue(repo, token, title, body, labels=["regression-aggregated"])
 
 
-def get_all_regression_failure_issues(repo, token, state="open", max_pages=10):
+def get_all_regression_failure_issues(repo, token, label, state="open", max_pages=10):
     """
     Fetch all issues with the label 'regression-failure' from the given repo.
     :param repo: GitHub repo in 'owner/repo' format
@@ -301,7 +301,7 @@ def get_all_regression_failure_issues(repo, token, state="open", max_pages=10):
     while page <= max_pages:
         params = {
             "state": state,
-            "labels": "regression-failure",
+            "labels": label,
             "per_page": 100,
             "page": page
         }
@@ -398,6 +398,7 @@ def main():
     repo = os.environ.get('GITHUB_REPOSITORY')
     token = os.environ.get('GITHUB_TOKEN')
     env = os.environ.get('REGRESSION_ENV', 'uat')
+    label = f"regression-failure-{env}"
 
     collection_concept_id = []
     providers = []
@@ -433,7 +434,7 @@ def main():
 
     runtime = boto3.client(service_name="bedrock-runtime", region_name="us-west-2", config=retry_config)
 
-    old_issues = get_all_regression_failure_issues(repo, token)
+    old_issues = get_all_regression_failure_issues(repo, token, label)
     old_issue_numbers = [issue["number"] for issue in old_issues]
 
     all_failures = []
@@ -482,7 +483,7 @@ def main():
                             )
                             issue = get_github_issue_by_title(repo, token, title)
                             if not issue:
-                                create_github_issue(repo, token, title, body_md, labels=["regression-failure"])
+                                create_github_issue(repo, token, title, body_md, labels=[label])
                                 issue = get_github_issue_by_title(repo, token, title)
                             if issue:
                                 issue_url = issue.get('html_url')
@@ -517,7 +518,7 @@ def main():
             if repo and token:
                 short_name = collection_names.get(concept_id, 'Unknown Collection')
                 title = f"Regression Failure: {env} | {concept_id} | {short_name}"
-                create_or_update_github_issue(repo, token, title, body_md, labels=["regression-failure"])
+                create_or_update_github_issue(repo, token, title, body_md, labels=[label])
 
     for number in old_issue_numbers:
         if number not in failure_issue_numbers:
