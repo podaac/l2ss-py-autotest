@@ -9,13 +9,18 @@ on:
       max-parallel:
         required: false
         type: number
-        default: 3
+        default: 2
+      environment:
+        required: true
+        type: string
     secrets:
       CMR_USER:
         required: true
       CMR_PASS:
         required: true
-
+permissions:
+  actions: read   # needed to query jobs API
+  contents: read  # optional, if accessing repo files
 jobs:
   process:
     runs-on: ubuntu-latest
@@ -27,6 +32,78 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(inputs.chunk-data) }}
     steps:
+
+      - name: Set CMR bearer token dynamically
+        id: set-cmr-token
+        run: |
+          case "${{ inputs.environment }}" in
+            UAT)
+              echo "CMR_BEARER_TOKEN=${{ secrets.UAT_URS_TOKEN }}" >> $GITHUB_ENV
+              ;;
+            OPS)
+              echo "CMR_BEARER_TOKEN=${{ secrets.OPS_URS_TOKEN }}" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "❌ Unknown environment: ${{ inputs.environment }}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Get matrix job URL
+        run: |
+          echo "Fetching job URL for matrix job (env=${{ matrix.env }}, file=${{ matrix.file }})..."
+          
+          # Retry logic to find job URL (may take a moment for API to register)
+          MAX_RETRIES=5
+          RETRY_DELAY=10
+          PER_PAGE=100
+          MATRIX_JOB_URL=""
+          
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $attempt/$MAX_RETRIES..."
+
+            PAGE=1
+            FOUND_URL=""
+
+            while : ; do
+              echo "  Fetching jobs page $PAGE..."
+
+              RESPONSE=$(curl -s \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=$PER_PAGE&page=$PAGE")
+
+              MATRIX_JOB_URL=$(echo "$RESPONSE" | jq -r \
+                --arg env "${{ matrix.env }}" \
+                --arg file "${{ matrix.file }}" \
+                '.jobs[] | select(.name | endswith("process (\($env), \($file))")) | .html_url')
+
+              if [ -n "$MATRIX_JOB_URL" ]; then
+                FOUND_URL="$MATRIX_JOB_URL"
+                echo "✅ Found job URL: $FOUND_URL"
+                break 2  # Break BOTH loops
+              fi
+
+              # check if this page was short → no more pages
+              COUNT=$(echo "$RESPONSE" | jq '.jobs | length')
+              if [ "$COUNT" -lt "$PER_PAGE" ]; then
+                echo "  No more job pages on this attempt."
+                break
+              fi
+
+              PAGE=$((PAGE+1))
+            done
+
+            if [ -z "$FOUND_URL" ]; then
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                echo "⏳ Job not found yet, waiting ${RETRY_DELAY}s before retry..."
+                sleep $RETRY_DELAY
+              fi
+            fi
+          done
+          
+          echo "MATRIX_JOB_URL=$MATRIX_JOB_URL" >> "$GITHUB_ENV"
+
       - name: Print env and file
         run: echo "Env=${{ matrix.env }} File=${{ matrix.file }}"
 
@@ -47,6 +124,55 @@ jobs:
         run: poetry install
 
       - name: Run Regression
+        id: regression
+        env:
+            CMR_BEARER_TOKEN: ${{ env.CMR_BEARER_TOKEN }}
         working-directory: tests
         run: |
-          poetry run pytest verify_collection.py --env ${{ matrix.env }} --concept_id ${{ matrix.file }}
+          poetry run pytest -s -n 2 verify_collection.py \
+            --env ${{ matrix.env }} \
+            --concept_id ${{ matrix.file }} \
+            --tb=short | tee ../pytest_output.log
+
+      - name: Save job status, URL, and regression results
+        working-directory: tests
+        run: |
+          reason=""
+          status="success"
+          results_file="${{ matrix.env }}_regression_results.json"
+          fail_count=0
+          if [ -f "$results_file" ]; then
+            reason="$(cat "$results_file" | jq -c .)"
+            # Determine status from regression results JSON
+            fail_count=$(cat "$results_file" | jq '.failed | length')
+            if [ "$fail_count" != "0" ]; then
+              status="failure"
+            fi
+          fi
+          jq -n \
+            --arg env "${{ matrix.env }}" \
+            --arg file "${{ matrix.file }}" \
+            --arg url "${{ env.MATRIX_JOB_URL }}" \
+            --arg status "$status" \
+            --arg reason "$reason" \
+            '{env: $env, file: $file, url: $url, status: $status, reason: $reason}' > job_status.json
+
+      - name: Upload job status artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: job-status-${{ matrix.env }}-${{ matrix.file }}
+          path: tests/job_status.json 
+
+      - name: Fail job if regression failed (from results)
+        working-directory: tests
+        run: |
+          results_file="${{ matrix.env }}_regression_results.json"
+          fail_count=0
+          if [ -f "$results_file" ]; then
+            fail_count=$(cat "$results_file" | jq '.failed | length')
+          fi
+          if [ "$fail_count" != "0" ]; then
+            echo "Regression failed (from results), marking job as failed."
+            exit 1
+          fi
