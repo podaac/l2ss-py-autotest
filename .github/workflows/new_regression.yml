@@ -161,20 +161,6 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets[format('AWS_ACCESS_KEY_ID_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
-          aws-secret-access-key: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
-          aws-region: us-west-2
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets[format('AWS_ACCESS_KEY_ID_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
-          aws-secret-access-key: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_SERVICES_{0}', needs.determine-environment.outputs.environment_upper)] }}
-          aws-region: us-west-2
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PERSONAL_JAMESFWOOD }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PERSONAL_JAMESFWOOD }}
           aws-region: us-west-2
