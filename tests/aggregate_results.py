@@ -9,6 +9,7 @@ from requests.auth import HTTPBasicAuth
 import textwrap
 from botocore.config import Config
 from datetime import datetime
+from podaac_agents.agents.stack_trace_agent import stack_trace_agent
 
 def bearer_token(env):
 
@@ -455,8 +456,14 @@ def main():
                     error_sections = []
                     for fail in reason_json["failed"]:
                         fail["message"] = format_message(fail["message"])
-                        solution = bedrock_suggest_solution_anthropic(runtime, fail["message"])
-                        summary = bedrock_summarize_error_anthropic(runtime, fail["message"])
+                        #solution = bedrock_suggest_solution_anthropic(runtime, fail["message"])
+                        #summary = bedrock_summarize_error_anthropic(runtime, fail["message"])
+
+                        # Use the stack trace agent to get the solution and summary
+                        response = stack_trace_agent(fail["message"])
+                        
+                        solution = response.structured_output.suggested_solution
+                        summary = response.structured_output.short_summary
                         wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
 
                         concept_id = fail.get('concept_id', '')

@@ -21,6 +21,7 @@ pytest-xdist = "^3.6.1"
 groq = "^0.13.1"
 boto3 = "^1.38.36"
 junitparser = "^3.2.0"
+podaac-agents = {git = "https://github.com/podaac/podaac-agents.git"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.1"
