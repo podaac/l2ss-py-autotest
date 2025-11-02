@@ -152,6 +152,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: 2.1.3
+
+      - name: Poetry Install
+        run: poetry install
+
       - name: Download all job status artifacts
         uses: actions/download-artifact@v4
         with:
@@ -173,4 +186,4 @@ jobs:
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
-          python3 tests/aggregate_results.py
+          poetry run python tests/aggregate_results.py
