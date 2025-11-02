@@ -277,7 +277,7 @@ def create_aggregated_github_issue(repo, token, all_failures, env, collection_na
         # Ensure links are valid URLs or empty
         job_url_str = f"[regression]({job_url})" if job_url and job_url.startswith('http') else ''
         issue_url_str = f"[issue]({issue_url})" if issue_url and issue_url.startswith('http') else ''
-        line = f"- `{concept_id}` ({short_name}) -- {test_type} -- {issue_url_str} {summary}".strip()
+        line = f"- `{concept_id}` ({short_name}) –– {test_type} –– {issue_url_str} {summary}".strip()
         body_lines.append(line)
     body = "\n".join(body_lines)
     create_or_update_github_issue(repo, token, title, body, labels=["regression-aggregated"])
@@ -463,9 +463,10 @@ def main():
                         response = stack_trace_agent(fail["message"])
                         
                         solution = response.structured_output.suggested_solution
+                        wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
                         short_summary = response.structured_output.short_summary
                         detailed_summary = response.structured_output.detailed_summary
-                        wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
+                        wrapped_detailed_summary = "\n".join(textwrap.wrap(detailed_summary, width=100))
 
                         concept_id = fail.get('concept_id', '')
                         short_name = collection_names.get(concept_id, 'Unknown Collection')
@@ -477,7 +478,7 @@ def main():
                             f"**Error Message:**\n"
                             f"```text\n{fail.get('message', '').strip()}\n```\n"
                             f"**Summary:**\n"
-                            f"```text\n{detailed_summary}\n```\n"
+                            f"```text\n{wrapped_detailed_summary}\n```\n"
                             f"**Suggested Solution:**\n"
                             f"```text\n{wrapped_solution}\n```\n"
                         )
