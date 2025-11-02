@@ -463,7 +463,8 @@ def main():
                         response = stack_trace_agent(fail["message"])
                         
                         solution = response.structured_output.suggested_solution
-                        summary = response.structured_output.short_summary
+                        short_summary = response.structured_output.short_summary
+                        detailed_summary = response.structured_output.detailed_summary
                         wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
 
                         concept_id = fail.get('concept_id', '')
@@ -475,7 +476,9 @@ def main():
                             f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
                             f"**Error Message:**\n"
                             f"```text\n{fail.get('message', '').strip()}\n```\n"
-                            f"**Possible Solution:**\n"
+                            f"**Summary:**\n"
+                            f"```text\n{detailed_summary}\n```\n"
+                            f"**Suggested Solution:**\n"
                             f"```text\n{wrapped_solution}\n```\n"
                         )
 
@@ -508,7 +511,7 @@ def main():
                             'solution': solution,
                             'job_url': url,
                             'issue_url': issue_url,
-                            'summary': summary
+                            'summary': short_summary
                         })
                     pretty_reason = json.dumps(reason_json, indent=2)
                     body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Failures:\n\n" + "\n".join(error_sections)
