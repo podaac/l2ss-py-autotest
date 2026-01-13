@@ -171,13 +171,6 @@ jobs:
           pattern: job-status-*
           path: job-status
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PERSONAL_JAMESFWOOD }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PERSONAL_JAMESFWOOD }}
-          aws-region: us-west-2
-
       - name: Aggregate failed jobs and print URLs and reasons
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -185,5 +178,6 @@ jobs:
           REGRESSION_ENV: ${{ needs.determine-environment.outputs.environment_upper }}
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           poetry run python tests/aggregate_results.py

@@ -103,8 +103,13 @@ def get_github_issue_by_title(repo, token, title, max_retries=5, delay=2):
     return None
 
 
-def create_or_update_github_issue(repo, token, title, body, labels=None):
-    existing_issue = get_github_issue_by_title(repo, token, title)
+def create_or_update_github_issue(repo, token, title, body, labels=None, issue_number=None):
+    if existing_issue is None:
+        existing_issue = get_github_issue_by_title(repo, token, title)
+    else:
+        existing_issue = {
+            "number" : issue_number
+        }
     if existing_issue:
         issue_number = existing_issue["number"]
         url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
@@ -280,7 +285,14 @@ def create_aggregated_github_issue(repo, token, all_failures, env, collection_na
         line = f"- `{concept_id}` ({short_name}) –– {test_type} –– {issue_url_str} {summary}".strip()
         body_lines.append(line)
     body = "\n".join(body_lines)
-    create_or_update_github_issue(repo, token, title, body, labels=["regression-aggregated"])
+
+    if env == "UAT":
+        issue_number = "3919"
+    elif env == "OPS":
+        issue_number = "3973"
+    else:
+        issue_number = None
+    create_or_update_github_issue(repo, token, title, body, labels=["regression-aggregated"], issue_number=issue_number)
 
 
 def get_all_regression_failure_issues(repo, token, label, state="open", max_pages=10):
