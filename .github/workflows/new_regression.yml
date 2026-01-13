@@ -52,6 +52,7 @@ jobs:
           fi
           echo "Checking tokens at $BASE_URL/api/users/tokens"
           RESPONSE=$(curl -s -u "$CMR_USER:$CMR_PASS" "$BASE_URL/api/users/tokens")
+          echo "API response: $RESPONSE"
           TOKEN_COUNT=$(echo "$RESPONSE" | jq 'length')
           if [ "$TOKEN_COUNT" -lt 1 ]; then
             echo "❌ No tokens found for $BASE_URL"
