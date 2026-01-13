@@ -38,25 +38,27 @@ jobs:
           echo "environment=$ENV" >> "$GITHUB_OUTPUT"
           echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
 
-      - name: Check EDL tokens exist (OPS & UAT)
+      - name: Check EDL tokens exist for environment
         env:
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
+          ENV: ${{ steps.set-env.outputs.environment }}
         run: |
           set -e
-          for BASE_URL in "https://urs.uat.earthdata.nasa.gov" "https://urs.earthdata.nasa.gov"; do
-            echo "Checking tokens at $BASE_URL/api/users/tokens"
-            RESPONSE=$(curl -s -u "$CMR_USER:$CMR_PASS" "$BASE_URL/api/users/tokens")
-            TOKEN_COUNT=$(echo "$RESPONSE" | jq '.tokens | length')
-            if [ "$TOKEN_COUNT" -lt 1 ]; then
-              echo "❌ No tokens found for $BASE_URL"
-              exit 1
-            else
-              echo "✅ $TOKEN_COUNT tokens found for $BASE_URL"
-            fi
-          done
-
-
+          if [ "$ENV" = "uat" ]; then
+            BASE_URL="https://urs.uat.earthdata.nasa.gov"
+          else
+            BASE_URL="https://urs.earthdata.nasa.gov"
+          fi
+          echo "Checking tokens at $BASE_URL/api/users/tokens"
+          RESPONSE=$(curl -s -u "$CMR_USER:$CMR_PASS" "$BASE_URL/api/users/tokens")
+          TOKEN_COUNT=$(echo "$RESPONSE" | jq '.tokens | length')
+          if [ "$TOKEN_COUNT" -lt 1 ]; then
+            echo "❌ No tokens found for $BASE_URL"
+            exit 1
+          else
+            echo "✅ $TOKEN_COUNT tokens found for $BASE_URL"
+          fi
 
   generate-chunks:
     needs: determine-environment
