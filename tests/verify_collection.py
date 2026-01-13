@@ -116,7 +116,7 @@ def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str, r
     cmr_url = f"{cmr_mode}granules.umm_json?collection_concept_id={collection_concept_id}&sort_key=-start_date&page_size=1"
 
     response_json = request_session.get(cmr_url, headers={'Authorization': f'Bearer {bearer_token}'}).json()
-
+    print(resp)
     if 'items' in response_json and len(response_json['items']) > 0:
         return response_json['items'][0]
     elif cmr_mode == cmr.CMR_UAT:
