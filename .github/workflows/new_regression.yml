@@ -147,6 +147,25 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           done
 
+      - name: Check EDL tokens exist (OPS & UAT)
+      env:
+        CMR_USER: ${{ secrets.CMR_USER }}
+        CMR_PASS: ${{ secrets.CMR_PASS }}
+      run: |
+        set -e
+        for BASE_URL in "https://urs.uat.earthdata.nasa.gov" "https://urs.earthdata.nasa.gov"; do
+          echo "Checking tokens at $BASE_URL/api/users/tokens"
+          RESPONSE=$(curl -s -u "$CMR_USER:$CMR_PASS" "$BASE_URL/api/users/tokens")
+          TOKEN_COUNT=$(echo "$RESPONSE" | jq '.tokens | length')
+          if [ "$TOKEN_COUNT" -lt 1 ]; then
+            echo "❌ No tokens found for $BASE_URL"
+            exit 1
+          else
+            echo "✅ $TOKEN_COUNT tokens found for $BASE_URL"
+          fi
+        done
+
+
   process-chunk-1:
     needs: [determine-environment, generate-chunks]
     if: needs.generate-chunks.outputs.chunk1 != ''
