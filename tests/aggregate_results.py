@@ -104,7 +104,7 @@ def get_github_issue_by_title(repo, token, title, max_retries=5, delay=2):
 
 
 def create_or_update_github_issue(repo, token, title, body, labels=None, issue_number=None):
-    if existing_issue is None:
+    if issue_number is None:
         existing_issue = get_github_issue_by_title(repo, token, title)
     else:
         existing_issue = {
