@@ -51,8 +51,20 @@ def get_associations(token, env):
 
     service_concept_id = cmr.queries.ServiceQuery(mode=mode).provider('POCLOUD').name('PODAAC L2 Cloud Subsetter').get()[0].get('concept_id')
     url = cmr.queries.CollectionQuery(mode=mode).service_concept_id(service_concept_id)._build_url()
-    collections_query = requests.get(url, headers=headers, params={'page_size': 2000}).json()['feed']['entry']
+    print(f"[get_associations] env={env}, service_concept_id={service_concept_id}")
+    print(f"[get_associations] url={url}")
+    resp = requests.get(url, headers=headers, params={'page_size': 2000})
+    print(f"[get_associations] response status={resp.status_code}")
+    if resp.status_code != 200:
+        print(f"[get_associations] response body (first 500 chars): {resp.text[:500]}")
+        return []
+    data = resp.json()
+    collections_query = data.get('feed', {}).get('entry', [])
+    print(f"[get_associations] entries returned={len(collections_query)}")
     collections = [a.get('id') for a in collections_query]
+    if collections:
+        print(f"[get_associations] sample ids (first 3): {collections[:3]}")
+    print(f"[get_associations] total collection ids={len(collections)}")
 
     filename = f"{env}_associations.json"
     with open(filename, 'w') as file:
