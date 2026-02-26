@@ -30,7 +30,10 @@ jobs:
     strategy:
       max-parallel: ${{ inputs.max-parallel }}
       fail-fast: false
-      matrix: ${{ fromJson(inputs.chunk-data) }}
+      # inputs.chunk-data is a JSON array of {env, file} objects.
+      # Wrap it into matrix.include so matrix.env and matrix.file are available.
+      matrix:
+        include: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
       - name: Set CMR bearer token dynamically

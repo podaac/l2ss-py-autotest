@@ -69,7 +69,10 @@ jobs:
           echo "Chunk size: $chunk_size"
           echo "Chunks: $num_chunks"
 
-          # Generate a single JSON array of all chunks for the Matrix
+          # Generate a single JSON array of all chunks for the Matrix.
+          # Each element has:
+          #   - id:     1-based chunk index (for naming)
+          #   - include: [{env, file}, ...] used by the child workflow matrix.
           chunks_json=$(
             for i in $(seq 0 $((num_chunks - 1))); do
               start=$((i * chunk_size))
@@ -77,10 +80,10 @@ jobs:
               
               [ ${#chunk[@]} -eq 0 ] && continue
               
-              # Output each chunk as a discrete JSON object
+              chunk_id=$((i + 1))
               printf '%s\n' "${chunk[@]}" \
                 | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
-                | jq -s '{include: .}'
+                | jq -s --arg id "$chunk_id" '{id: ($id|tonumber), include: .}'
             done | jq -s -c '.' # Slurp all objects into one valid JSON array
           )
 
@@ -90,6 +93,7 @@ jobs:
     needs: setup-and-chunk
     # Only run if there are actual chunks to process
     if: ${{ needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
+    name: process-chunk-${{ matrix.chunk.id }}
     strategy:
       fail-fast: false
       matrix:
@@ -99,7 +103,9 @@ jobs:
     secrets: inherit
     with:
       # Pass the specific matrix payload as a JSON string
-      chunk-data: ${{ toJSON(matrix.chunk) }}
+      # Only pass the include list to the child workflow; it will wrap it
+      # into a matrix.include internally.
+      chunk-data: ${{ toJSON(matrix.chunk.include) }}
       environment: ${{ needs.setup-and-chunk.outputs.environment_upper }}
 
   aggregate-failures:
