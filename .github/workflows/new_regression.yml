@@ -54,7 +54,7 @@ jobs:
           fi
 
           max_chunk_size=250
-          num_chunks=8
+          num_chunks=10
 
           # Compute dynamic chunk size
           chunk_size=$(( (total + num_chunks - 1) / num_chunks ))
