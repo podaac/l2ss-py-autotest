@@ -435,219 +435,343 @@ def get_collection_names(providers, env, collections_list):
     return collections
 
 
-def main():
-    job_status_files = glob.glob(os.path.join('job-status', '*', 'job_status.json'))
-    failed = False
-    repo = os.environ.get('GITHUB_REPOSITORY')
-    token = os.environ.get('GITHUB_TOKEN')
-    env = os.environ.get('REGRESSION_ENV', 'uat')
-    label = f"regression-failure-{env}"
+# -----------------------------------------------------------------------------
+# Main orchestration helpers (used to break up main() into smaller steps)
+# -----------------------------------------------------------------------------
 
-    current_associations = get_associations(token, env)
-    # Convert to set for faster lookups, handle None case
-    if current_associations is None:
-        current_associations = set()
-    else:
-        current_associations = set(current_associations)
 
+def load_current_associations(token, env):
+    """
+    Load the set of collection concept_ids that are currently associated with
+    the PODAAC L2 Cloud Subsetter service in CMR. Used to decide whether to
+    create/update regression issues (only for associated collections) and to
+    close issues for collections that are no longer associated.
+    """
+    raw = get_associations(token, env)
+    if raw is None:
+        return set()
+    return set(raw)
+
+
+def collect_concept_ids_and_providers(job_status_files):
+    """
+    First pass over failed job status files: parse the failure reason JSON and
+    collect unique concept_ids and providers. Used to fetch collection short
+    names from GraphQL and to know which collections we care about.
+    """
     collection_concept_id = []
     providers = []
-
-    # First pass: Collect concept IDs and providers
     for fpath in job_status_files:
         with open(fpath) as f:
             data = json.load(f)
-        if data.get('status') != 'success':
-            reason = data.get('reason', '')
+        if data.get("status") != "success":
+            reason = data.get("reason", "")
             try:
                 reason_json = json.loads(reason)
                 if isinstance(reason_json, dict) and "failed" in reason_json:
                     for fail in reason_json["failed"]:
-                        concept_id = fail.get('concept_id', '')
+                        concept_id = fail.get("concept_id", "")
                         if concept_id and concept_id not in collection_concept_id:
                             collection_concept_id.append(concept_id)
-                            # Get provider from concept_id (assuming the format stays the same)
-                            provider = concept_id.split('-')[1]
+                            provider = concept_id.split("-")[1]
                             if provider not in providers:
                                 providers.append(provider)
             except Exception:
                 pass
+    return collection_concept_id, providers
 
-    collection_names = get_collection_names(providers, env, collection_concept_id)  
 
-    retry_config = Config(
-        retries={
-            "max_attempts": 10,
-            "mode": "adaptive"
-        }
-    )
-
-    runtime = boto3.client(service_name="bedrock-runtime", region_name="us-west-2", config=retry_config)
-
-    old_issues = get_all_regression_failure_issues(repo, token, label)
-    old_issue_numbers = [issue["number"] for issue in old_issues]
-    # Create a mapping of concept_id to issue numbers from old issues
-    old_issue_concept_map = {}
+def build_old_issue_concept_map(old_issues):
+    """
+    Build a mapping from concept_id to GitHub issue number for existing
+    regression-failure issues. Issue titles are assumed to be of the form:
+    'Regression Failure: {env} | {concept_id} | {short_name}'.
+    """
+    mapping = {}
     for issue in old_issues:
         title = issue.get("title", "")
-        # Extract concept_id from title format: "Regression Failure: {env} | {concept_id} | {short_name}"
         if "|" in title:
             parts = title.split("|")
             if len(parts) >= 2:
                 concept_id = parts[1].strip()
-                old_issue_concept_map[concept_id] = issue["number"]
+                mapping[concept_id] = issue["number"]
+    return mapping
 
-    all_failures = []
-    failure_issue_numbers = []
-    no_associations = []
-    for fpath in job_status_files:
-        with open(fpath) as f:
-            data = json.load(f)
-        if data.get('status') != 'success':
-            url = data.get('url', '')
-            reason = data.get('reason', '')
-            concept_id = None  # Initialize concept_id for this job
-            print(f"FAILED JOB: {url}")
-            print("REGRESSION RESULTS:")
-            try:
-                reason_json = json.loads(reason)
-                timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
-                if isinstance(reason_json, dict) and "failed" in reason_json:
-                    error_sections = []
-                    for fail in reason_json["failed"]:
-                        fail["message"] = format_message(fail["message"])
-                        #solution = bedrock_suggest_solution_anthropic(runtime, fail["message"])
-                        #summary = bedrock_summarize_error_anthropic(runtime, fail["message"])
+def process_one_failure(
+    fail,
+    url,
+    timestamp,
+    collection_names,
+    current_associations,
+    old_issue_concept_map,
+    repo,
+    token,
+    env,
+    label,
+):
+    """
+    Process a single failure entry from a job's reason JSON: format message,
+    get summary/solution via stack_trace_agent, then either close the issue
+    (if concept_id not in current_associations) or create/update the issue
+    (if in associations). Returns (failure_record, issue_number, is_no_association, section).
+    section is the markdown block for the aggregated body; caller uses it to build error_sections.
+    """
+    fail["message"] = format_message(fail["message"])
+    response = stack_trace_agent(fail["message"])
+    concept_id = fail.get("concept_id", "")
+    short_name = collection_names.get(concept_id, "Unknown Collection")
+    test_type = fail.get("test_type", "")
 
-                        # Use the stack trace agent to get the solution and summary
-                        response = stack_trace_agent(fail["message"])
-                        
-                        concept_id = fail.get('concept_id', '')
-                        short_name = collection_names.get(concept_id, 'Unknown Collection')
-                        test_type = fail.get('test_type', '')
+    solution = response.structured_output.suggested_solution
+    wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
+    short_summary = response.structured_output.short_summary
+    detailed_summary = response.structured_output.detailed_summary
+    wrapped_detailed_summary = "\n".join(textwrap.wrap(detailed_summary, width=100))
 
-                        solution = response.structured_output.suggested_solution
-                        wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
-                        short_summary = response.structured_output.short_summary
-                        detailed_summary = response.structured_output.detailed_summary
-                        wrapped_detailed_summary = "\n".join(textwrap.wrap(detailed_summary, width=100))
+    section = (
+        f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
+        f"**Error Message:**\n"
+        f"```text\n{fail.get('message', '').strip()}\n```\n"
+        f"**Summary:**\n"
+        f"```text\n{wrapped_detailed_summary}\n```\n"
+        f"**Suggested Solution:**\n"
+        f"```text\n{wrapped_solution}\n```\n"
+    )
 
-                        # Create or update individual issue
-                        section = (
-                            f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
-                            f"**Error Message:**\n"
-                            f"```text\n{fail.get('message', '').strip()}\n```\n"
-                            f"**Summary:**\n"
-                            f"```text\n{wrapped_detailed_summary}\n```\n"
-                            f"**Suggested Solution:**\n"
-                            f"```text\n{wrapped_solution}\n```\n"
-                        )
+    issue_url = None
+    issue_number = None
+    is_no_association = concept_id not in current_associations
 
-                        error_sections.append(section)
-                        issue_url = None
-                        
-                        # Check if concept_id is in current_associations
-                        if concept_id not in current_associations:
-                            if concept_id and concept_id not in no_associations:
-                                no_associations.append(concept_id)
-                            # Close existing issue if it exists
-                            if repo and token and concept_id in old_issue_concept_map:
-                                issue_number = old_issue_concept_map[concept_id]
-                                close_url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
-                                close_headers = {
-                                    "Authorization": f"token {token}",
-                                    "Accept": "application/vnd.github+json"
-                                }
-                                close_data = {"state": "closed"}
-                                close_response = requests.patch(close_url, headers=close_headers, json=close_data)
-                                if close_response.status_code == 200:
-                                    print(f"Closed issue for concept_id not in associations: {concept_id} (issue #{issue_number})")
-                                else:
-                                    print(f"Failed to close issue for concept_id {concept_id} (status {close_response.status_code})\n{close_response.text}")
-                        elif repo and token:
-                            # Only create/update issues if concept_id is in current_associations
-                            title = f"Regression Failure: {env} | {concept_id} | {short_name}"
-                            body_md = (
-                                f"**Updated:** {timestamp}\n\n"
-                                f"Job URL: {url}\n\n"
-                                + section
-                            )
-                            issue = get_github_issue_by_title(repo, token, title)
-                            if not issue:
-                                create_github_issue(repo, token, title, body_md, labels=[label])
-                                issue = get_github_issue_by_title(repo, token, title)
-                            if issue:
-                                issue_url = issue.get('html_url')
-                                issue_number = issue.get('number')
-                                if issue_number is not None:
-                                    failure_issue_numbers.append(issue_number)
+    if is_no_association:
+        # Track for "no associations" section; close existing issue if any
+        if repo and token and concept_id in old_issue_concept_map:
+            issue_number = old_issue_concept_map[concept_id]
+            close_url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
+            close_headers = {
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+            }
+            close_response = requests.patch(
+                close_url, headers=close_headers, json={"state": "closed"}
+            )
+            if close_response.status_code == 200:
+                print(f"Closed issue for concept_id not in associations: {concept_id} (issue #{issue_number})")
+            else:
+                print(
+                    f"Failed to close issue for concept_id {concept_id} (status {close_response.status_code})\n{close_response.text}"
+                )
+        failure_record = None
+        return failure_record, issue_number, is_no_association, section
 
-                        concept_id = fail.get('concept_id', '')
-                        if concept_id not in collection_concept_id:
-                            collection_concept_id.append(concept_id)
-                        # Only add to all_failures if concept_id is in current_associations
-                        if concept_id in current_associations:
-                            all_failures.append({
-                                'concept_id': concept_id,
-                                'test_type': fail.get('test_type', ''),
-                                'message': fail.get('message', '').strip(),
-                                'solution': solution,
-                                'job_url': url,
-                                'issue_url': issue_url,
-                                'summary': short_summary
-                            })
-                    pretty_reason = json.dumps(reason_json, indent=2)
-                    body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Failures:\n\n" + "\n".join(error_sections)
-                else:
-                    pretty_reason = format_message(reason)
-                    body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
-            except Exception as ex:
-                print(ex)
-                pretty_reason = format_message(reason)
-                body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
-            print(pretty_reason)
-            print("----------------------")
-            failed = True
-            # Only create issue if we have a concept_id and it's in current_associations
-            if repo and token and concept_id and concept_id in current_associations:
-                short_name = collection_names.get(concept_id, 'Unknown Collection')
-                title = f"Regression Failure: {env} | {concept_id} | {short_name}"
-                create_or_update_github_issue(repo, token, title, body_md, labels=[label])
-
-    # Close old issues that are no longer in current associations
+    # concept_id is in current_associations: create or update GitHub issue
     if repo and token:
-        for concept_id, issue_number in old_issue_concept_map.items():
-            if concept_id not in current_associations and issue_number not in failure_issue_numbers:
-                close_url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
-                close_headers = {
-                    "Authorization": f"token {token}",
-                    "Accept": "application/vnd.github+json"
-                }
-                close_data = {"state": "closed"}
-                close_response = requests.patch(close_url, headers=close_headers, json=close_data)
-                if close_response.status_code == 200:
-                    print(f"Closed issue for concept_id not in associations: {concept_id} (issue #{issue_number})")
-                else:
-                    print(f"Failed to close issue for concept_id {concept_id} (status {close_response.status_code})\n{close_response.text}")
-    
-    # Close old issues that are no longer failing (but still in associations)
+        title = f"Regression Failure: {env} | {concept_id} | {short_name}"
+        body_md = f"**Updated:** {timestamp}\n\nJob URL: {url}\n\n" + section
+        issue = get_github_issue_by_title(repo, token, title)
+        if not issue:
+            create_github_issue(repo, token, title, body_md, labels=[label])
+            issue = get_github_issue_by_title(repo, token, title)
+        if issue:
+            issue_url = issue.get("html_url")
+            issue_number = issue.get("number")
+
+    failure_record = {
+        "concept_id": concept_id,
+        "test_type": fail.get("test_type", ""),
+        "message": fail.get("message", "").strip(),
+        "solution": solution,
+        "job_url": url,
+        "issue_url": issue_url,
+        "summary": short_summary,
+    }
+    return failure_record, issue_number, False, section
+
+
+def process_failed_job_file(
+    fpath,
+    current_associations,
+    old_issue_concept_map,
+    collection_names,
+    collection_concept_id,
+    repo,
+    token,
+    env,
+    label,
+    all_failures,
+    failure_issue_numbers,
+    no_associations,
+):
+    """
+    Process one failed job status file: read it, parse the failure reason, and
+    for each failed collection run process_one_failure. Appends to
+    all_failures, failure_issue_numbers, and no_associations. For non-JSON or
+    non-'failed' reasons, optionally create/update a single issue if we have a
+    concept_id in current_associations. Returns True if this job was a failure
+    (so caller can set failed = True).
+    """
+    with open(fpath) as f:
+        data = json.load(f)
+    if data.get("status") == "success":
+        return False
+
+    url = data.get("url", "")
+    reason = data.get("reason", "")
+    concept_id = None
+    print(f"FAILED JOB: {url}")
+    print("REGRESSION RESULTS:")
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    try:
+        reason_json = json.loads(reason)
+
+        if isinstance(reason_json, dict) and "failed" in reason_json:
+            error_sections = []
+            for fail in reason_json["failed"]:
+                failure_record, issue_number, is_no_assoc, section = process_one_failure(
+                    fail, url, timestamp, collection_names, current_associations,
+                    old_issue_concept_map, repo, token, env, label,
+                )
+                concept_id = fail.get("concept_id", "")
+                if concept_id and concept_id not in collection_concept_id:
+                    collection_concept_id.append(concept_id)
+                if is_no_assoc and concept_id and concept_id not in no_associations:
+                    no_associations.append(concept_id)
+                if failure_record is not None:
+                    all_failures.append(failure_record)
+                if issue_number is not None:
+                    failure_issue_numbers.append(issue_number)
+                error_sections.append(section)
+
+            pretty_reason = json.dumps(reason_json, indent=2)
+            body_md = (
+                f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Failures:\n\n"
+                + "\n".join(error_sections)
+            )
+        else:
+            pretty_reason = format_message(reason)
+            body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
+    except Exception as ex:
+        print(ex)
+        pretty_reason = format_message(reason)
+        body_md = f"**Updated:** {timestamp}\n\nJob Run: {url}\n\nRegression Results:\n```text\n{pretty_reason}\n```"
+
+    print(pretty_reason)
+    print("----------------------")
+
+    # Fallback: if we have a single concept_id (e.g. non-JSON reason), create/update one issue
+    if repo and token and concept_id and concept_id in current_associations:
+        short_name = collection_names.get(concept_id, "Unknown Collection")
+        title = f"Regression Failure: {env} | {concept_id} | {short_name}"
+        create_or_update_github_issue(repo, token, title, body_md, labels=[label])
+
+    return True
+
+
+def close_issues_not_in_associations(
+    repo, token, old_issue_concept_map, current_associations, failure_issue_numbers
+):
+    """
+    Close GitHub issues for concept_ids that are no longer in current
+    associations. This runs after processing all jobs so we close issues for
+    collections that were removed from the service even if they didn't fail
+    this run.
+    """
+    if not repo or not token:
+        return
+    for concept_id, issue_number in old_issue_concept_map.items():
+        if concept_id not in current_associations and issue_number not in failure_issue_numbers:
+            close_url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
+            close_headers = {
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+            }
+            close_response = requests.patch(
+                close_url, headers=close_headers, json={"state": "closed"}
+            )
+            if close_response.status_code == 200:
+                print(f"Closed issue for concept_id not in associations: {concept_id} (issue #{issue_number})")
+            else:
+                print(
+                    f"Failed to close issue for concept_id {concept_id} (status {close_response.status_code})\n{close_response.text}"
+                )
+
+
+def close_resolved_regression_issues(repo, token, old_issue_numbers, failure_issue_numbers):
+    """
+    Close GitHub issues that are no longer failing (i.e. the collection is
+    back to passing). Keeps the issue list in sync with current failures.
+    """
     for number in old_issue_numbers:
         if number not in failure_issue_numbers:
             url = f"https://api.github.com/repos/{repo}/issues/{number}"
             headers = {
                 "Authorization": f"token {token}",
-                "Accept": "application/vnd.github+json"
+                "Accept": "application/vnd.github+json",
             }
-            data = {"state": "closed"}
-            response = requests.patch(url, headers=headers, json=data)
+            response = requests.patch(url, headers=headers, json={"state": "closed"})
             if response.status_code == 200:
                 print(f"Closed issue number: {number}")
             else:
                 print(f"Failed to close issue number: {number} (status {response.status_code})\n{response.text}")
 
+
+def main():
+    # --- Configuration from environment ---
+    job_status_files = glob.glob(os.path.join("job-status", "*", "job_status.json"))
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    token = os.environ.get("GITHUB_TOKEN")
+    env = os.environ.get("REGRESSION_ENV", "uat")
+    label = f"regression-failure-{env}"
+
+    # --- Load which collections are currently associated with the subsetter service ---
+    current_associations = load_current_associations(token, env)
+
+    # --- First pass: collect concept_ids and providers from failed jobs (for GraphQL lookup) ---
+    collection_concept_id, providers = collect_concept_ids_and_providers(job_status_files)
+    collection_names = get_collection_names(providers, env, collection_concept_id)
+
+    # --- Fetch existing open regression-failure issues and map concept_id -> issue number ---
+    old_issues = get_all_regression_failure_issues(repo, token, label)
+    old_issue_numbers = [issue["number"] for issue in old_issues]
+    old_issue_concept_map = build_old_issue_concept_map(old_issues)
+
+    # --- Process each failed job file: create/update or close issues, build failure lists ---
+    all_failures = []
+    failure_issue_numbers = []
+    no_associations = []
+    failed = False
+    for fpath in job_status_files:
+        if process_failed_job_file(
+            fpath,
+            current_associations,
+            old_issue_concept_map,
+            collection_names,
+            collection_concept_id,
+            repo,
+            token,
+            env,
+            label,
+            all_failures,
+            failure_issue_numbers,
+            no_associations,
+        ):
+            failed = True
+
+    # --- Close GitHub issues for collections no longer in current associations ---
+    close_issues_not_in_associations(
+        repo, token, old_issue_concept_map, current_associations, failure_issue_numbers
+    )
+
+    # --- Close GitHub issues for collections that are no longer failing ---
+    close_resolved_regression_issues(repo, token, old_issue_numbers, failure_issue_numbers)
+
+    # --- Update the single aggregated regression-failures issue ---
     if (all_failures or no_associations) and repo and token:
-        create_aggregated_github_issue(repo, token, all_failures, env, collection_names, no_associations)
+        create_aggregated_github_issue(
+            repo, token, all_failures, env, collection_names, no_associations
+        )
+
     if not failed:
         print("No failed jobs.")
 

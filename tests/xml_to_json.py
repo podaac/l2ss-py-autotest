@@ -13,8 +13,6 @@ def extract_labels(case):
             labels.append("No UMM-V")
         if hasattr(result, "message") and re.search(r"Failed: Timeout \(>\d+(\.\d+)?s\) from pytest-timeout", str(result.message)):
             labels.append("Timeout")
-    if not labels:
-        labels.append('Other')
     return labels
 
 def determine_status(case):
