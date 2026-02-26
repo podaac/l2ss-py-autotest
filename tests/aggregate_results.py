@@ -42,7 +42,7 @@ def bearer_token(env):
 def get_associations(token, env):
 
     mode = cmr.queries.CMR_UAT
-    if env == "OPS":
+    if env.lower() == "ops":
         mode = cmr.queries.CMR_OPS
 
     headers = {
@@ -66,7 +66,6 @@ def get_associations(token, env):
         print(f"[get_associations] sample ids (first 3): {collections[:3]}")
     print(f"[get_associations] total collection ids={len(collections)}")
 
-    print(collections)
     return collections
 
 
