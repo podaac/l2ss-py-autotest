@@ -69,7 +69,7 @@ jobs:
           echo "Chunk size: $chunk_size"
           echo "Chunks: $num_chunks"
 
-          # Generate a single JSON array of all chunks for the Matrix, each with a numeric id
+          # Generate a single JSON array of all chunks for the Matrix
           chunks_json=$(
             for i in $(seq 0 $((num_chunks - 1))); do
               start=$((i * chunk_size))
@@ -77,11 +77,10 @@ jobs:
               
               [ ${#chunk[@]} -eq 0 ] && continue
               
-              # Output each chunk as a discrete JSON object with an id (1-based)
-              chunk_id=$((i + 1))
+              # Output each chunk as a discrete JSON object
               printf '%s\n' "${chunk[@]}" \
                 | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
-                | jq -s --arg id "$chunk_id" '{id: ($id|tonumber), include: .}'
+                | jq -s '{include: .}'
             done | jq -s -c '.' # Slurp all objects into one valid JSON array
           )
 
@@ -91,7 +90,6 @@ jobs:
     needs: setup-and-chunk
     # Only run if there are actual chunks to process
     if: ${{ needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
-    name: process-chunk-${{ matrix.chunk.id }}
     strategy:
       fail-fast: false
       matrix:
