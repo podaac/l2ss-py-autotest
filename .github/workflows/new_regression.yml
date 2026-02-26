@@ -135,6 +135,22 @@ jobs:
           pattern: job-status-*
           path: job-status
 
+      - name: Set CMR bearer token dynamically
+        id: set-cmr-token
+        run: |
+          case "${{ needs.setup-and-chunk.outputs.environment_upper }}" in
+            UAT)
+              echo "CMR_BEARER_TOKEN=${{ secrets.UAT_URS_TOKEN }}" >> $GITHUB_ENV
+              ;;
+            OPS)
+              echo "CMR_BEARER_TOKEN=${{ secrets.OPS_URS_TOKEN }}" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "❌ Unknown environment: ${{ needs.setup-and-chunk.outputs.environment_upper }}" >&2
+              exit 1
+              ;;
+          esac
+
       - name: Aggregate failed jobs and print URLs and reasons
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -143,5 +159,6 @@ jobs:
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CMR_BEARER_TOKEN: ${{ env.CMR_BEARER_TOKEN }}
         run: |
           poetry run python tests/aggregate_results.py
