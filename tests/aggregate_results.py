@@ -42,7 +42,7 @@ def bearer_token(env):
 def get_associations(token, env):
 
     mode = cmr.queries.CMR_UAT
-    if env == "ops":
+    if env == "OPS":
         mode = cmr.queries.CMR_OPS
 
     headers = {
@@ -66,10 +66,7 @@ def get_associations(token, env):
         print(f"[get_associations] sample ids (first 3): {collections[:3]}")
     print(f"[get_associations] total collection ids={len(collections)}")
 
-    filename = f"{env}_associations.json"
-    with open(filename, 'w') as file:
-        json.dump(collections, file)
-    
+    print(collections)
     return collections
 
 
@@ -523,33 +520,26 @@ def process_one_failure(
     label,
 ):
     """
-    Process a single failure entry from a job's reason JSON: format message,
-    get summary/solution via stack_trace_agent, then either close the issue
-    (if concept_id not in current_associations) or create/update the issue
-    (if in associations). Returns (failure_record, issue_number, is_no_association, section).
+    Process a single failure entry from a job's reason JSON.
+
+    For collections that are still associated (concept_id in current_associations),
+    this will:
+      - call stack_trace_agent to summarize the failure and suggest a solution
+      - create or update the per-collection regression GitHub issue
+      - return a failure_record (for all_failures) and a rich markdown section.
+
+    For collections that are no longer associated, this will:
+      - NOT call stack_trace_agent (we don't spend LLM calls on non-associated collections)
+      - close any existing regression issue for that concept_id
+      - return no failure_record and a minimal markdown section with just the raw message.
+
+    Returns (failure_record, issue_number, is_no_association, section).
     section is the markdown block for the aggregated body; caller uses it to build error_sections.
     """
     fail["message"] = format_message(fail["message"])
-    response = stack_trace_agent(fail["message"])
     concept_id = fail.get("concept_id", "")
     short_name = collection_names.get(concept_id, "Unknown Collection")
     test_type = fail.get("test_type", "")
-
-    solution = response.structured_output.suggested_solution
-    wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
-    short_summary = response.structured_output.short_summary
-    detailed_summary = response.structured_output.detailed_summary
-    wrapped_detailed_summary = "\n".join(textwrap.wrap(detailed_summary, width=100))
-
-    section = (
-        f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
-        f"**Error Message:**\n"
-        f"```text\n{fail.get('message', '').strip()}\n```\n"
-        f"**Summary:**\n"
-        f"```text\n{wrapped_detailed_summary}\n```\n"
-        f"**Suggested Solution:**\n"
-        f"```text\n{wrapped_solution}\n```\n"
-    )
 
     issue_url = None
     issue_number = None
@@ -573,10 +563,33 @@ def process_one_failure(
                 print(
                     f"Failed to close issue for concept_id {concept_id} (status {close_response.status_code})\n{close_response.text}"
                 )
+        # Minimal section with just the formatted error message; no LLM summary/solution.
+        section = (
+            f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
+            f"**Error Message:**\n"
+            f"```text\n{fail.get('message', '').strip()}\n```\n"
+        )
         failure_record = None
         return failure_record, issue_number, is_no_association, section
 
     # concept_id is in current_associations: create or update GitHub issue
+    response = stack_trace_agent(fail["message"])
+    solution = response.structured_output.suggested_solution
+    wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
+    short_summary = response.structured_output.short_summary
+    detailed_summary = response.structured_output.detailed_summary
+    wrapped_detailed_summary = "\n".join(textwrap.wrap(detailed_summary, width=100))
+
+    section = (
+        f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
+        f"**Error Message:**\n"
+        f"```text\n{fail.get('message', '').strip()}\n```\n"
+        f"**Summary:**\n"
+        f"```text\n{wrapped_detailed_summary}\n```\n"
+        f"**Suggested Solution:**\n"
+        f"```text\n{wrapped_solution}\n```\n"
+    )
+
     if repo and token:
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
         body_md = f"**Updated:** {timestamp}\n\nJob URL: {url}\n\n" + section
@@ -647,7 +660,7 @@ def process_failed_job_file(
                 concept_id = fail.get("concept_id", "")
                 if concept_id and concept_id not in collection_concept_id:
                     collection_concept_id.append(concept_id)
-                if is_no_assoc and concept_id and concept_id not in no_associations:
+                if is_no_assoc and concept_id:
                     no_associations.append(concept_id)
                 if failure_record is not None:
                     all_failures.append(failure_record)
