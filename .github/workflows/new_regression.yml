@@ -77,29 +77,27 @@ jobs:
               
               [ ${#chunk[@]} -eq 0 ] && continue
               
-              # Output each chunk as a discrete JSON object
+              # Inject 'id' (e.g., chunk-1) alongside the array
               printf '%s\n' "${chunk[@]}" \
                 | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
-                | jq -s '{include: .}'
-            done | jq -s -c '.' # Slurp all objects into one valid JSON array
+                | jq -s --arg chunk_id "chunk-$((i+1))" '{id: $chunk_id, include: .}'
+            done | jq -s -c '.'
           )
 
           echo "matrix_chunks=$chunks_json" >> "$GITHUB_OUTPUT"
 
   process-chunks:
+    name: Process Chunk ${{ matrix.chunk.id }}    # <--- This gives you clean UI names!
     needs: setup-and-chunk
-    # Only run if there are actual chunks to process
     if: ${{ needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
     strategy:
       fail-fast: false
       matrix:
-        # Dynamically spawn exactly as many jobs as we have chunks
         chunk: ${{ fromJson(needs.setup-and-chunk.outputs.matrix_chunks) }}
     uses: ./.github/workflows/process_chunk.yml
     secrets: inherit
     with:
-      # Pass the specific matrix payload as a JSON string
-      chunk-data: ${{ toJSON(matrix.chunk) }}
+      chunk-data: ${{ toJSON(matrix.chunk.include) }} # Notice we pass just the 'include' array now to keep data clean
       environment: ${{ needs.setup-and-chunk.outputs.environment_upper }}
 
   aggregate-failures:
