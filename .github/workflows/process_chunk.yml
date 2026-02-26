@@ -76,6 +76,15 @@ jobs:
                 -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
                 "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=$PER_PAGE&page=$PAGE")
 
+              # Ensure the response is valid JSON before passing it to jq,
+              # otherwise jq will fail with a parse error (e.g. if we hit
+              # a rate limit or permission error and get HTML/text instead).
+              if ! echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+                echo "  WARNING: Jobs API did not return valid JSON. Raw response:"
+                echo "  $RESPONSE"
+                break
+              fi
+
               MATRIX_JOB_URL=$(echo "$RESPONSE" | jq -r \
                 --arg env "${{ matrix.env }}" \
                 --arg file "${{ matrix.file }}" \
