@@ -724,7 +724,6 @@ def main():
     env = os.environ.get("REGRESSION_ENV", "uat")
     label = f"regression-failure-{env}"
 
-    # --- Load which collections are currently associated with the subsetter service ---
     current_associations = load_current_associations(token, env)
 
     # --- First pass: collect concept_ids and providers from failed jobs (for GraphQL lookup) ---

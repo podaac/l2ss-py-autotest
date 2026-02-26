@@ -17,16 +17,19 @@ on:
           - uat
 
 jobs:
-  determine-environment:
+  setup-and-chunk:
     runs-on: ubuntu-latest
     outputs:
-      environment: ${{ steps.set-env.outputs.environment }}
-      environment_upper: ${{ steps.set-env.outputs.environment_upper }}
+      environment: ${{ steps.prepare.outputs.environment }}
+      environment_upper: ${{ steps.prepare.outputs.environment_upper }}
+      matrix_chunks: ${{ steps.prepare.outputs.matrix_chunks }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      - id: set-env
+      - name: Determine Environment & Generate Chunks
+        id: prepare
         run: |
+          # 1. Determine Environment
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ENV="${{ inputs.environment }}"
           elif [ "${{ github.event.schedule }}" = "0 8 */3 * *" ]; then
@@ -38,25 +41,17 @@ jobs:
           echo "environment=$ENV" >> "$GITHUB_OUTPUT"
           echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
 
-  generate-chunks:
-    needs: determine-environment
-    runs-on: ubuntu-latest
-    outputs:
-      chunk1: ${{ steps.set.outputs.chunk1 }}
-      chunk2: ${{ steps.set.outputs.chunk2 }}
-      chunk3: ${{ steps.set.outputs.chunk3 }}
-      chunk4: ${{ steps.set.outputs.chunk4 }}
-      chunk5: ${{ steps.set.outputs.chunk5 }}
-    steps:
-
-      - uses: actions/checkout@v4
-
-      - name: Chuncking Files
-        id: set
-        run: |
+          # 2. Chunk Files
           shopt -s nullglob
-          files=(tests/cmr/l2ss-py/${{ needs.determine-environment.outputs.environment }}/*)
+          files=(tests/cmr/l2ss-py/${ENV}/*)
           total=${#files[@]}
+
+          # Handle 0 files gracefully
+          if [ "$total" -eq 0 ]; then
+            echo "No files found for environment $ENV!"
+            echo "matrix_chunks=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           max_chunk_size=250
           num_chunks=5
@@ -67,7 +62,6 @@ jobs:
           # Enforce the maximum
           if (( chunk_size > max_chunk_size )); then
             chunk_size=$max_chunk_size
-            # Recalculate how many chunks we actually need
             num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
           fi
 
@@ -75,77 +69,41 @@ jobs:
           echo "Chunk size: $chunk_size"
           echo "Chunks: $num_chunks"
 
-          for i in $(seq 0 $((num_chunks - 1))); do
-            [ $i -ge 5 ] && break
-            
-            start=$((i * chunk_size))
-            chunk=("${files[@]:start:chunk_size}")
-            
-            [ ${#chunk[@]} -eq 0 ] && continue
-            
-            json=$(printf '%s\n' "${chunk[@]}" \
-              | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
-              | jq -s '{include: .}')
-            {
-              echo "chunk$((i+1))<<EOF"
-              echo "$json"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          done
+          # Generate a single JSON array of all chunks for the Matrix
+          chunks_json=$(
+            for i in $(seq 0 $((num_chunks - 1))); do
+              start=$((i * chunk_size))
+              chunk=("${files[@]:start:chunk_size}")
+              
+              [ ${#chunk[@]} -eq 0 ] && continue
+              
+              # Output each chunk as a discrete JSON object
+              printf '%s\n' "${chunk[@]}" \
+                | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
+                | jq -s '{include: .}'
+            done | jq -s -c '.' # Slurp all objects into one valid JSON array
+          )
 
-  process-chunk-1:
-    needs: [determine-environment, generate-chunks]
-    if: needs.generate-chunks.outputs.chunk1 != ''
-    uses: ./.github/workflows/process_chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk1 }}
-      environment: ${{ needs.determine-environment.outputs.environment_upper }}
-  
-  process-chunk-2:
-    needs: [determine-environment, generate-chunks]
-    if: needs.generate-chunks.outputs.chunk2 != ''
-    uses: ./.github/workflows/process_chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk2 }}
-      environment: ${{ needs.determine-environment.outputs.environment_upper }}
+          echo "matrix_chunks=$chunks_json" >> "$GITHUB_OUTPUT"
 
-  process-chunk-3:
-    needs: [determine-environment, generate-chunks]
-    if: needs.generate-chunks.outputs.chunk3 != ''
+  process-chunks:
+    needs: setup-and-chunk
+    # Only run if there are actual chunks to process
+    if: ${{ needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Dynamically spawn exactly as many jobs as we have chunks
+        chunk: ${{ fromJson(needs.setup-and-chunk.outputs.matrix_chunks) }}
     uses: ./.github/workflows/process_chunk.yml
     secrets: inherit
     with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk3 }}
-      environment: ${{ needs.determine-environment.outputs.environment_upper }}
-
-  process-chunk-4:
-    needs: [determine-environment, generate-chunks]
-    if: needs.generate-chunks.outputs.chunk4 != ''
-    uses: ./.github/workflows/process_chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk4 }}
-      environment: ${{ needs.determine-environment.outputs.environment_upper }}
-
-  process-chunk-5:
-    needs: [determine-environment, generate-chunks]
-    if: needs.generate-chunks.outputs.chunk5 != ''
-    uses: ./.github/workflows/process_chunk.yml
-    secrets: inherit
-    with:
-      chunk-data: ${{ needs.generate-chunks.outputs.chunk5 }}
-      environment: ${{ needs.determine-environment.outputs.environment_upper }}
+      # Pass the specific matrix payload as a JSON string
+      chunk-data: ${{ toJSON(matrix.chunk) }}
+      environment: ${{ needs.setup-and-chunk.outputs.environment_upper }}
 
   aggregate-failures:
-    needs:
-      - determine-environment
-      - process-chunk-1
-      - process-chunk-2
-      - process-chunk-3
-      - process-chunk-4
-      - process-chunk-5
+    needs: [setup-and-chunk, process-chunks]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -175,7 +133,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          REGRESSION_ENV: ${{ needs.determine-environment.outputs.environment_upper }}
+          REGRESSION_ENV: ${{ needs.setup-and-chunk.outputs.environment_upper }}
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
