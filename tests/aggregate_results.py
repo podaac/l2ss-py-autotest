@@ -748,7 +748,8 @@ def main():
     env = os.environ.get("REGRESSION_ENV", "uat")
     label = f"regression-failure-{env}"
 
-    current_associations = load_current_associations(token, env)
+    edl_token = bearer_token(env)
+    current_associations = load_current_associations(edl_token, env)
 
     # --- First pass: collect concept_ids and providers from failed jobs (for GraphQL lookup) ---
     collection_concept_id, providers = collect_concept_ids_and_providers(job_status_files)
