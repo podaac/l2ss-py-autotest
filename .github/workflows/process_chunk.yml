@@ -30,7 +30,10 @@ jobs:
     strategy:
       max-parallel: ${{ inputs.max-parallel }}
       fail-fast: false
-      matrix: ${{ fromJson(inputs.chunk-data) }}
+      # inputs.chunk-data is a JSON array of {env, file} objects.
+      # Wrap it into matrix.include so matrix.env and matrix.file are available.
+      matrix:
+        include: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
       - name: Set CMR bearer token dynamically
@@ -73,6 +76,15 @@ jobs:
                 -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
                 "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=$PER_PAGE&page=$PAGE")
 
+              # Ensure the response is valid JSON before passing it to jq,
+              # otherwise jq will fail with a parse error (e.g. if we hit
+              # a rate limit or permission error and get HTML/text instead).
+              if ! echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+                echo "  WARNING: Jobs API did not return valid JSON. Raw response:"
+                echo "  $RESPONSE"
+                break
+              fi
+
               MATRIX_JOB_URL=$(echo "$RESPONSE" | jq -r \
                 --arg env "${{ matrix.env }}" \
                 --arg file "${{ matrix.file }}" \
@@ -113,12 +125,12 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
 
       - name: Install Poetry
         uses: abatilo/actions-poetry@v3
         with:
-          poetry-version: 2.1.3
+          poetry-version: 2.3.2
 
       - name: Poetry Install
         run: poetry install
