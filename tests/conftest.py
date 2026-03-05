@@ -47,6 +47,13 @@ def record_results(request):
 def pytest_addoption(parser):
     parser.addoption("--env", action="store", choices=['uat', 'ops'], help="Environment to use for testing",
                      required=True)
+    parser.addoption(
+        "--token-provider",
+        action="store",
+        choices=["direct", "lambda"],
+        default=os.environ.get("CMR_TOKEN_PROVIDER", "direct"),
+        help="Token source: direct EDL token API or Lambda token provider",
+    )
 
     group = parser.getgroup('test_mode')
     group.addoption("--concept_id", action="store", help="Concept ID of single collection to test")
@@ -148,4 +155,3 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 file_path = f'{env}_{outcome}.json'
                 with open(file_path, 'w') as file:
                     json.dump(tests, file)
-

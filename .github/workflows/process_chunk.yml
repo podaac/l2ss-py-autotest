@@ -135,14 +135,33 @@ jobs:
       - name: Poetry Install
         run: poetry install
 
-      - name: Run Regression
-        id: regression
+      - name: Configure AWS credentials for UAT
+        if: matrix.env == 'uat'
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
+          aws-region: us-west-2
+
+      - name: Configure AWS credentials for OPS
+        if: matrix.env == 'ops'
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_OPS }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_OPS }}
+          aws-region: us-west-2
+
+      - name: Run Regression with Lambda Token Provider
+        id: regression_with_token
         env:
-            CMR_BEARER_TOKEN: ${{ env.CMR_BEARER_TOKEN }}
-        working-directory: tests
+          venue: ${{ matrix.env }}
+          CMR_TOKEN_PROVIDER: lambda
+          CMR_TOKEN_LAMBDA_FUNCTION_NAME: ${{ env.venue }}-launchpad_token_dispenser
+          CMR_TOKEN_LAMBDA_REGION: us-west-2
         run: |
           poetry run pytest -s -n 2 verify_collection.py \
             --env ${{ matrix.env }} \
+            --token-provider lambda \
             --concept_id ${{ matrix.file }} \
             --tb=short | tee ../pytest_output.log
 

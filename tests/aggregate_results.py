@@ -170,6 +170,23 @@ def format_message(msg, max_lines=30):
     return "\n".join(lines)
 
 
+def extract_labels_from_message(message):
+    """
+    Extract GitHub labels from a failed test message.
+    """
+    labels = []
+    message = str(message or "")
+    if "No granules found" in message:
+        labels.append("No Granules")
+    if "There are no umm-v associated with this collection" in message:
+        labels.append("No UMM-V")
+    if re.search(r"Failed: Timeout \(>\d+(\.\d+)?s\) from pytest-timeout", message):
+        labels.append("Timeout")
+    if "Forbidden: Unable to download" in message:
+        labels.append("Forbidden")
+    return labels
+
+
 def bedrock_summarize_error(runtime, error_message):
 
     # return "test summary"
@@ -536,6 +553,7 @@ def process_one_failure(
     section is the markdown block for the aggregated body; caller uses it to build error_sections.
     """
     fail["message"] = format_message(fail["message"])
+    error_labels = extract_labels_from_message(fail["message"])
     concept_id = fail.get("concept_id", "")
     short_name = collection_names.get(concept_id, "Unknown Collection")
     test_type = fail.get("test_type", "")
@@ -593,9 +611,19 @@ def process_one_failure(
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
         body_md = f"**Updated:** {timestamp}\n\nJob URL: {url}\n\n" + section
         issue = get_github_issue_by_title(repo, token, title)
+        issue_labels = [label] + error_labels
         if not issue:
-            create_github_issue(repo, token, title, body_md, labels=[label])
+            create_github_issue(repo, token, title, body_md, labels=issue_labels)
             issue = get_github_issue_by_title(repo, token, title)
+        elif issue.get("number") is not None:
+            create_or_update_github_issue(
+                repo,
+                token,
+                title,
+                body_md,
+                labels=issue_labels,
+                issue_number=issue.get("number"),
+            )
         if issue:
             issue_url = issue.get("html_url")
             issue_number = issue.get("number")
@@ -604,6 +632,7 @@ def process_one_failure(
         "concept_id": concept_id,
         "test_type": fail.get("test_type", ""),
         "message": fail.get("message", "").strip(),
+        "labels": error_labels,
         "solution": solution,
         "job_url": url,
         "issue_url": issue_url,
@@ -687,7 +716,8 @@ def process_failed_job_file(
     if repo and token and concept_id and concept_id in current_associations:
         short_name = collection_names.get(concept_id, "Unknown Collection")
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
-        create_or_update_github_issue(repo, token, title, body_md, labels=[label])
+        error_labels = extract_labels_from_message(pretty_reason)
+        create_or_update_github_issue(repo, token, title, body_md, labels=[label] + error_labels)
 
     return True
 
