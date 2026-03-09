@@ -18,6 +18,14 @@ on:
         required: true
       CMR_PASS:
         required: true
+      AWS_ACCESS_KEY_ID_CUMULUS_UAT:
+        required: true
+      AWS_SECRET_ACCESS_KEY_CUMULUS_UAT:
+        required: true
+      AWS_ACCESS_KEY_ID_CUMULUS_OPS:
+        required: true
+      AWS_SECRET_ACCESS_KEY_CUMULUS_OPS:
+        required: true
 permissions:
   actions: read   # needed to query jobs API
   contents: read  # optional, if accessing repo files
@@ -36,21 +44,35 @@ jobs:
         include: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
-      - name: Set CMR bearer token dynamically
+      - name: Configure AWS credentials (UAT)
+        if: ${{ inputs.environment == 'UAT' }}
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
+          aws-region: us-west-2
+
+      - name: Configure AWS credentials (OPS)
+        if: ${{ inputs.environment == 'OPS' }}
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_OPS }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_OPS }}
+          aws-region: us-west-2
+
+      - name: Set CMR bearer token from AWS SSM
         id: set-cmr-token
         run: |
-          case "${{ inputs.environment }}" in
-            UAT)
-              echo "CMR_BEARER_TOKEN=${{ secrets.UAT_URS_TOKEN }}" >> $GITHUB_ENV
-              ;;
-            OPS)
-              echo "CMR_BEARER_TOKEN=${{ secrets.OPS_URS_TOKEN }}" >> $GITHUB_ENV
-              ;;
-            *)
-              echo "❌ Unknown environment: ${{ inputs.environment }}" >&2
-              exit 1
-              ;;
-          esac
+          ENV_LOWER=$(echo "${{ inputs.environment }}" | tr '[:upper:]' '[:lower:]')
+          if [[ "$ENV_LOWER" != "uat" && "$ENV_LOWER" != "ops" ]]; then
+            echo "❌ Unknown environment: ${{ inputs.environment }}" >&2
+            exit 1
+          fi
+
+          PARAM_NAME="service-generate-${ENV_LOWER}-edl-token"
+          TOKEN=$(aws ssm get-parameter --name "$PARAM_NAME" --with-decryption --query 'Parameter.Value' --output text)
+          echo "::add-mask::$TOKEN"
+          echo "CMR_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
       - name: Get matrix job URL
         run: |
