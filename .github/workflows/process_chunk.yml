@@ -70,7 +70,34 @@ jobs:
           fi
 
           PARAM_NAME="service-generate-${ENV_LOWER}-edl-token"
-          TOKEN=$(aws ssm get-parameter --name "$PARAM_NAME" --with-decryption --query 'Parameter.Value' --output text)
+          MAX_ATTEMPTS=5
+          TOKEN=""
+          for ATTEMPT in $(seq 1 $MAX_ATTEMPTS); do
+            set +e
+            OUTPUT=$(aws ssm get-parameter --name "$PARAM_NAME" --with-decryption --query 'Parameter.Value' --output text 2>&1)
+            EXIT_CODE=$?
+            set -e
+
+            if [ $EXIT_CODE -eq 0 ]; then
+              TOKEN="$OUTPUT"
+              break
+            fi
+
+            if echo "$OUTPUT" | grep -Eq 'ParameterNotFound|AccessDenied'; then
+              echo "❌ Non-retryable SSM error for $PARAM_NAME: $OUTPUT" >&2
+              exit 1
+            fi
+
+            if [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; then
+              SLEEP_SECS=$((2 ** ATTEMPT))
+              echo "SSM get-parameter failed (attempt $ATTEMPT/$MAX_ATTEMPTS). Retrying in ${SLEEP_SECS}s..."
+              sleep "$SLEEP_SECS"
+            else
+              echo "❌ Failed to retrieve SSM parameter $PARAM_NAME after $MAX_ATTEMPTS attempts: $OUTPUT" >&2
+              exit 1
+            fi
+          done
+
           echo "::add-mask::$TOKEN"
           echo "CMR_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
