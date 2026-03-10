@@ -36,22 +36,6 @@ jobs:
         include: ${{ fromJson(inputs.chunk-data) }}
     steps:
 
-      - name: Set CMR bearer token dynamically
-        id: set-cmr-token
-        run: |
-          case "${{ inputs.environment }}" in
-            UAT)
-              echo "CMR_BEARER_TOKEN=${{ secrets.UAT_URS_TOKEN }}" >> $GITHUB_ENV
-              ;;
-            OPS)
-              echo "CMR_BEARER_TOKEN=${{ secrets.OPS_URS_TOKEN }}" >> $GITHUB_ENV
-              ;;
-            *)
-              echo "❌ Unknown environment: ${{ inputs.environment }}" >&2
-              exit 1
-              ;;
-          esac
-
       - name: Get matrix job URL
         run: |
           echo "Fetching job URL for matrix job (env=${{ matrix.env }}, file=${{ matrix.file }})..."
@@ -135,14 +119,20 @@ jobs:
       - name: Poetry Install
         run: poetry install
 
-      - name: Run Regression
-        id: regression
-        env:
-            CMR_BEARER_TOKEN: ${{ env.CMR_BEARER_TOKEN }}
+      - name: Configure AWS credentials for UAT
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
+          aws-region: us-west-2
+
+      - name: Run Regression with Lambda Token Provider
+        id: regression_with_token
         working-directory: tests
         run: |
           poetry run pytest -s -n 2 verify_collection.py \
             --env ${{ matrix.env }} \
+            --token-provider lambda \
             --concept_id ${{ matrix.file }} \
             --tb=short | tee ../pytest_output.log
 
