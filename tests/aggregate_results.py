@@ -161,8 +161,10 @@ def extract_labels_from_message(message):
         labels.append("No UMM-V")
     if re.search(r"Failed: Timeout \(>\d+(\.\d+)?s\) from pytest-timeout", message):
         labels.append("Timeout")
-    if "Forbidden: Unable to download" in message:
+    if "Unable to download" in message:
         labels.append("Forbidden")
+    if "Could not determine time variable" in message:
+        labels.append("No Time Var")
     return labels
 
 
