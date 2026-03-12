@@ -56,7 +56,7 @@ jobs:
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
-          poetry run pytest verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
+          poetry run pytest verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --token-provider lambda --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
 
       - name: Convert XML to JSON
         id: run-xml-to-json

@@ -16,9 +16,8 @@ import requests
 import xarray
 import csv
 
-from requests.auth import HTTPBasicAuth
-
 import cmr
+import token_utils
 
 VALID_LATITUDE_VARIABLE_NAMES = ['lat', 'latitude']
 VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
@@ -26,9 +25,31 @@ VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
 assert cfxr, "cf_xarray adds extensions to xarray on import"
 GROUP_DELIM = '__'
 
+
+def fetch_bearer_token_by_provider(env: str, request_session: requests.Session, token_provider: str) -> str:
+    try:
+        token = token_utils.fetch_bearer_token_by_provider(
+            env, token_provider, request_session=request_session
+        )
+        if token:
+            return token
+    except Exception as e:
+        logging.warning(f"Error getting token from EDL: {e}", exc_info=True)
+    pytest.fail("Unable to get bearer token from EDL or environment variable")
+
+
+def is_auth_error(exception: Exception) -> bool:
+    msg = str(exception).lower()
+    return any(keyword in msg for keyword in ["401", "403", "unauthorized", "forbidden", "token", "expired"])
+
 @pytest.fixture(scope="session")
 def env(pytestconfig):
     return pytestconfig.getoption("env")
+
+
+@pytest.fixture(scope="session")
+def token_provider(pytestconfig):
+    return pytestconfig.getoption("token_provider")
 
 
 @pytest.fixture(scope="session")
@@ -78,28 +99,42 @@ def skip_spatial(env):
 
 
 @pytest.fixture(scope="session")
-def bearer_token(env: str, request_session: requests.Session) -> str:
-    # Try to get token from environment variable first
-    token = os.environ.get("CMR_BEARER_TOKEN")
-    if token:
-        return token
+def bearer_token_manager(env: str, request_session: requests.Session, token_provider: str):
+    token_state = {"token": fetch_bearer_token_by_provider(env, request_session, token_provider)}
 
-    url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
-    try:
-        resp = request_session.post(
-            url,
-            auth=HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS'])
-        )
-        if resp.status_code == 200:
-            response_content = resp.json()
-            return response_content.get('access_token')
-    except Exception as e:
-        logging.warning(f"Error getting the token (status code {resp.status_code}): {e}", exc_info=True)
-    pytest.fail("Unable to get bearer token from EDL or environment variable")
+    def get_token(refresh: bool = False) -> str:
+        if refresh:
+            token_state["token"] = fetch_bearer_token_by_provider(env, request_session, token_provider)
+        return token_state["token"]
+
+    return get_token
 
 
 @pytest.fixture(scope="function")
-def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str, request_session) -> dict:
+def bearer_token(bearer_token_manager) -> str:
+    return bearer_token_manager()
+
+
+@pytest.fixture(scope="function")
+def authed_request(request_session: requests.Session, bearer_token_manager):
+    def _request(method: str, url: str, **kwargs):
+        headers = dict(kwargs.pop("headers", {}) or {})
+        headers['Authorization'] = f'Bearer {bearer_token_manager()}'
+        response = request_session.request(method, url, headers=headers, **kwargs)
+
+        if response.status_code in (401, 403):
+            logging.info("Token expired or unauthorized response from %s. Refreshing token and retrying once.", url)
+            response.close()
+            headers['Authorization'] = f'Bearer {bearer_token_manager(refresh=True)}'
+            response = request_session.request(method, url, headers=headers, **kwargs)
+
+        return response
+
+    return _request
+
+
+@pytest.fixture(scope="function")
+def granule_json(collection_concept_id: str, cmr_mode: str, authed_request) -> dict:
     '''
     This fixture defines the strategy used for picking a granule from a collection for testing
 
@@ -107,7 +142,7 @@ def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str, r
     ----------
     collection_concept_id
     cmr_mode
-    bearer_token
+    authed_request
 
     Returns
     -------
@@ -115,7 +150,7 @@ def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str, r
     '''
     cmr_url = f"{cmr_mode}granules.umm_json?collection_concept_id={collection_concept_id}&sort_key=-start_date&page_size=1"
 
-    response_json = request_session.get(cmr_url, headers={'Authorization': f'Bearer {bearer_token}'}).json()
+    response_json = authed_request("GET", cmr_url).json()
 
     if 'items' in response_json and len(response_json['items']) > 0:
         return response_json['items'][0]
@@ -126,13 +161,12 @@ def granule_json(collection_concept_id: str, cmr_mode: str, bearer_token: str, r
 
 
 @pytest.fixture(scope="function")
-def original_granule_localpath(granule_json: dict, tmp_path, bearer_token: str,
-                               request_session: requests.Session) -> pathlib.Path:
+def original_granule_localpath(granule_json: dict, tmp_path, authed_request) -> pathlib.Path:
     urls = granule_json['umm']['RelatedUrls']
 
     def download_file(url):
         local_filename = tmp_path.joinpath(f"{granule_json['meta']['concept-id']}_original_granule.nc")
-        response = request_session.get(url, headers={'Authorization': f'Bearer {bearer_token}'}, stream=True)
+        response = authed_request("GET", url, stream=True)
         with open(local_filename, 'wb') as f:
             shutil.copyfileobj(response.raw, f)
         return local_filename
@@ -149,27 +183,35 @@ def original_granule_localpath(granule_json: dict, tmp_path, bearer_token: str,
 
 
 @pytest.fixture(scope="function")
-def collection_variables(cmr_mode, collection_concept_id, env, bearer_token):
-    collection_query = cmr.queries.CollectionQuery(mode=cmr_mode)
-    variable_query = cmr.queries.VariableQuery(mode=cmr_mode)
+def collection_variables(cmr_mode, collection_concept_id, env, bearer_token_manager):
+    for attempt in range(2):
+        token = bearer_token_manager(refresh=(attempt == 1))
+        try:
+            collection_query = cmr.queries.CollectionQuery(mode=cmr_mode)
+            variable_query = cmr.queries.VariableQuery(mode=cmr_mode)
 
-    collection_res = collection_query.concept_id(collection_concept_id).token(bearer_token).get()[0]
-    collection_associations = collection_res.get("associations")
-    variable_concept_ids = collection_associations.get("variables")
+            collection_res = collection_query.concept_id(collection_concept_id).token(token).get()[0]
+            collection_associations = collection_res.get("associations")
+            variable_concept_ids = collection_associations.get("variables")
 
-    if variable_concept_ids is None:
-        pytest.fail(f'There are no umm-v associated with this collection in {env}')
+            if variable_concept_ids is None:
+                pytest.fail(f'There are no umm-v associated with this collection in {env}')
 
-    variables = []
-    for i in range(0, len(variable_concept_ids), 40):
-        variables_items = variable_query \
-            .concept_id(variable_concept_ids[i:i + 40]) \
-            .token(bearer_token) \
-            .format('umm_json') \
-            .get_all()
-        variables.extend(json.loads(variables_items[0]).get('items'))
+            variables = []
+            for i in range(0, len(variable_concept_ids), 40):
+                variables_items = variable_query \
+                    .concept_id(variable_concept_ids[i:i + 40]) \
+                    .token(token) \
+                    .format('umm_json') \
+                    .get_all()
+                variables.extend(json.loads(variables_items[0]).get('items'))
 
-    return variables
+            return variables
+        except Exception as e:
+            if attempt == 0 and is_auth_error(e):
+                logging.info("Auth error while querying collection variables. Refreshing token and retrying once.")
+                continue
+            raise
 
 
 def get_half_temporal_extent(start: str, end: str):
@@ -436,7 +478,7 @@ def walk_netcdf_groups(subsetted_filepath, lat_var_name):
 
 @pytest.mark.timeout(1200)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token, skip_spatial):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_spatial):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
 
     if collection_concept_id in skip_spatial:
@@ -451,25 +493,31 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
     end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
     
-    # Build harmony request
-    harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
     request_bbox = harmony.BBox(w=west, s=south, e=east, n=north)
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection, spatial=request_bbox,
                                       granule_id=[granule_json['meta']['concept-id']])
-
-    logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
-
-    # Submit harmony request and download result
-    job_id = harmony_client.submit(harmony_request)
-    logging.info("Submitted harmony job %s", job_id)
-    harmony_client.wait_for_processing(job_id, show_progress=False)
     subsetted_filepath = None
-    for filename in [file_future.result()
-                     for file_future
-                     in harmony_client.download_all(job_id, directory=f'{tmp_path}', overwrite=True)]:
-        logging.info(f'Downloaded: %s', filename)
-        subsetted_filepath = pathlib.Path(filename)
+    for attempt in range(2):
+        try:
+            harmony_client = harmony.Client(env=harmony_env, token=bearer_token_manager(refresh=(attempt == 1)))
+            logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
+
+            # Submit harmony request and download result
+            job_id = harmony_client.submit(harmony_request)
+            logging.info("Submitted harmony job %s", job_id)
+            harmony_client.wait_for_processing(job_id, show_progress=False)
+            for filename in [file_future.result()
+                             for file_future
+                             in harmony_client.download_all(job_id, directory=f'{tmp_path}', overwrite=True)]:
+                logging.info(f'Downloaded: %s', filename)
+                subsetted_filepath = pathlib.Path(filename)
+            break
+        except Exception as e:
+            if attempt == 0 and is_auth_error(e):
+                logging.info("Auth error while running Harmony request. Refreshing token and retrying once.")
+                continue
+            raise
 
     # Verify spatial subset worked
     subsetted_ds = xarray.open_dataset(subsetted_filepath, decode_times=False)
@@ -568,7 +616,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
 @pytest.mark.timeout(1200)
 def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token, skip_temporal):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_temporal):
     test_spatial_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
 
     if collection_concept_id in skip_temporal:
@@ -578,18 +626,24 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
     end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
     temporal_subset = get_half_temporal_extent(start_time, end_time)
     
-    # Build harmony request
-    harmony_client = harmony.Client(env=harmony_env, token=bearer_token)
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection,
                                       granule_id=[granule_json['meta']['concept-id']],
                                       temporal=temporal_subset)
+    for attempt in range(2):
+        try:
+            harmony_client = harmony.Client(env=harmony_env, token=bearer_token_manager(refresh=(attempt == 1)))
+            logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
 
-    logging.info("Sending harmony request %s", harmony_client.request_as_url(harmony_request))
+            # Submit harmony request and download result
+            job_id = harmony_client.submit(harmony_request)
+            logging.info("Submitted harmony job %s", job_id)
+            harmony_client.wait_for_processing(job_id, show_progress=False)
+            assert harmony_client.status(job_id).get('status') == "successful"
+            break
+        except Exception as e:
+            if attempt == 0 and is_auth_error(e):
+                logging.info("Auth error while running Harmony request. Refreshing token and retrying once.")
+                continue
+            raise
 
-    # Submit harmony request and download result
-    job_id = harmony_client.submit(harmony_request)
-    logging.info("Submitted harmony job %s", job_id)
-
-    harmony_client.wait_for_processing(job_id, show_progress=False)
-    assert harmony_client.status(job_id).get('status') == "successful"
