@@ -7,6 +7,7 @@ import create_or_update_issue
 from groq import Groq
 import time
 import re
+from verify_collection import find_custom_tests
 
 try:
     os.environ['CMR_USER']
@@ -158,6 +159,26 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             if tests:
                 print(f'{outcome.capitalize()} Tests')
                 print(tests)
-                file_path = f'{env}_{outcome}.json'
-                with open(file_path, 'w') as file:
-                    json.dump(tests, file)
+
+
+def pytest_collection_modifyitems(config, items):
+    concept_id = config.getoption("concept_id")
+    if not concept_id:
+        return
+
+    custom = find_custom_tests(concept_id)
+    if not custom.get("any"):
+        return
+
+    deselected = []
+    kept = []
+    for item in items:
+        base_name = getattr(item, "originalname", None) or item.name
+        if base_name in ("test_spatial_subset", "test_temporal_subset"):
+            deselected.append(item)
+        else:
+            kept.append(item)
+
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = kept

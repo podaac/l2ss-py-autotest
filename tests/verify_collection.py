@@ -27,6 +27,7 @@ GROUP_DELIM = '__'
 DEFAULT_SPATIAL_BBOX_SCALE = 0.95
 DEFAULT_TEMPORAL_FRACTION = 0.5
 CUSTOM_TESTS_DIRNAME = "custom"
+CUSTOM_GROUPS_DIRNAME = "groups"
 
 
 def fetch_bearer_token_by_provider(env: str, request_session: requests.Session, token_provider: str) -> str:
@@ -140,6 +141,10 @@ def _custom_tests_root() -> pathlib.Path:
     return pathlib.Path(__file__).parent.joinpath(CUSTOM_TESTS_DIRNAME)
 
 
+def _custom_groups_root() -> pathlib.Path:
+    return _custom_tests_root().joinpath(CUSTOM_GROUPS_DIRNAME)
+
+
 def _provider_custom_file(provider: str) -> pathlib.Path:
     return _custom_tests_root().joinpath("providers", f"{provider}.py")
 
@@ -162,17 +167,135 @@ def _collection_custom_dir_has_tests(collection_concept_id: str) -> bool:
     return False
 
 
+def _group_concept_ids_file(group_dir: pathlib.Path) -> pathlib.Path:
+    return group_dir.joinpath("concept_ids.json")
+
+
+def _load_group_concept_ids(group_dir: pathlib.Path) -> list:
+    path = _group_concept_ids_file(group_dir)
+    if not path.exists():
+        return []
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except Exception:
+        return []
+    if isinstance(data, dict):
+        members = data.get("members", [])
+        return members if isinstance(members, list) else []
+    return data if isinstance(data, list) else []
+
+
+def _group_dir_has_tests(group_dir: pathlib.Path) -> bool:
+    if not group_dir.exists() or not group_dir.is_dir():
+        return False
+    for path in group_dir.rglob("*.py"):
+        if path.name.startswith("test_") or path.name.endswith("_test.py"):
+            return True
+    return False
+
+
+def _matching_group_dirs(collection_concept_id: str) -> list:
+    root = _custom_groups_root()
+    if not root.exists() or not root.is_dir():
+        return []
+    matches = []
+    for group_dir in sorted(root.iterdir()):
+        if not group_dir.is_dir():
+            continue
+        members = _load_group_concept_ids(group_dir)
+        if collection_concept_id in members and _group_dir_has_tests(group_dir):
+            matches.append(group_dir)
+    return matches
+
+
 def find_custom_tests(collection_concept_id: str) -> dict:
     provider = parse_provider_from_concept_id(collection_concept_id)
     provider_file = _provider_custom_file(provider) if provider else None
     collection_file = _collection_custom_file(collection_concept_id)
     has_provider = bool(provider_file and provider_file.exists())
     has_collection = collection_file.exists() or _collection_custom_dir_has_tests(collection_concept_id)
+    group_dirs = _matching_group_dirs(collection_concept_id)
+    has_group = bool(group_dirs)
     return {
         "provider": has_provider,
         "collection": has_collection,
-        "any": has_provider or has_collection,
+        "group": has_group,
+        "groups": [p.name for p in group_dirs],
+        "any": has_provider or has_collection or has_group,
     }
+
+
+def _load_custom_test_functions(path: pathlib.Path):
+    if not path or not path.exists():
+        return []
+    import importlib.util
+    import inspect
+
+    module_name = f"custom_{abs(hash(str(path)))}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if not spec or not spec.loader:
+        return []
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    functions = []
+    for name, obj in inspect.getmembers(module, inspect.isfunction):
+        if name.startswith("test_"):
+            functions.append((name, obj))
+    return functions
+
+
+def _load_custom_dir_test_functions(collection_concept_id: str):
+    functions = []
+    collection_dir = _collection_custom_dir(collection_concept_id)
+    if not collection_dir.exists() or not collection_dir.is_dir():
+        return functions
+    for path in collection_dir.rglob("*.py"):
+        if path.name.startswith("test_") or path.name.endswith("_test.py"):
+            functions.extend(_load_custom_test_functions(path))
+    return functions
+
+
+def _load_group_test_functions(collection_concept_id: str):
+    functions = []
+    for group_dir in _matching_group_dirs(collection_concept_id):
+        for path in group_dir.rglob("*.py"):
+            if path.name.startswith("test_") or path.name.endswith("_test.py"):
+                functions.extend(_load_custom_test_functions(path))
+    return functions
+
+
+def _run_custom_tests_for_collection(collection_concept_id: str, request):
+    import inspect
+    provider = parse_provider_from_concept_id(collection_concept_id)
+    provider_file = _provider_custom_file(provider) if provider else None
+    collection_file = _collection_custom_file(collection_concept_id)
+
+    functions = []
+    functions.extend(_load_custom_test_functions(collection_file))
+    functions.extend(_load_custom_dir_test_functions(collection_concept_id))
+    if not functions:
+        functions.extend(_load_group_test_functions(collection_concept_id))
+    if not functions:
+        functions.extend(_load_custom_test_functions(provider_file))
+
+    if not functions:
+        pytest.skip(f"No custom tests found for {collection_concept_id}")
+
+    for name, func in functions:
+        kwargs = {}
+        for param in inspect.signature(func).parameters:
+            kwargs[param] = request.getfixturevalue(param)
+        try:
+            func(**kwargs)
+        except Exception as exc:
+            raise AssertionError(f"Custom test {name} failed") from exc
+
+
+@pytest.mark.timeout(1200)
+def test_custom_collection_or_provider(collection_concept_id, request):
+    _run_custom_tests_for_collection(collection_concept_id, request)
 
 
 def should_run_generic(test_kind: str, overrides: dict) -> bool:
@@ -614,8 +737,8 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         pytest.skip(f"Generic spatial disabled for {collection_concept_id}")
 
     custom_tests = find_custom_tests(collection_concept_id)
-    if custom_tests.get("collection") and not collection_overrides.get("also_run_generic", False):
-        pytest.skip(f"Custom collection tests present; skipping generic spatial for {collection_concept_id}")
+    if (custom_tests.get("collection") or custom_tests.get("group")) and not collection_overrides.get("also_run_generic", False):
+        pytest.skip(f"Custom collection/group tests present; skipping generic spatial for {collection_concept_id}")
     if custom_tests.get("provider") and collection_overrides.get("replace_generic", False):
         pytest.skip(f"Custom provider tests present; skipping generic spatial for {collection_concept_id}")
 
@@ -765,8 +888,8 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
         pytest.skip(f"Generic temporal disabled for {collection_concept_id}")
 
     custom_tests = find_custom_tests(collection_concept_id)
-    if custom_tests.get("collection") and not collection_overrides.get("also_run_generic", False):
-        pytest.skip(f"Custom collection tests present; skipping generic temporal for {collection_concept_id}")
+    if (custom_tests.get("collection") or custom_tests.get("group")) and not collection_overrides.get("also_run_generic", False):
+        pytest.skip(f"Custom collection/group tests present; skipping generic temporal for {collection_concept_id}")
     if custom_tests.get("provider") and collection_overrides.get("replace_generic", False):
         pytest.skip(f"Custom provider tests present; skipping generic temporal for {collection_concept_id}")
 
