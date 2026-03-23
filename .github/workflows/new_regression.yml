@@ -135,6 +135,22 @@ jobs:
           pattern: job-status-*
           path: job-status
 
+      - name: Set CMR bearer token dynamically
+        id: set-cmr-token
+        run: |
+          case "${{ inputs.environment }}" in
+            UAT)
+              echo "CMR_BEARER_TOKEN=${{ secrets.UAT_URS_TOKEN }}" >> $GITHUB_ENV
+              ;;
+            OPS)
+              echo "CMR_BEARER_TOKEN=${{ secrets.OPS_URS_TOKEN }}" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "❌ Unknown environment: ${{ inputs.environment }}" >&2
+              exit 1
+              ;;
+          esac
+
       - name: Configure AWS credentials for UAT
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -147,7 +163,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           REGRESSION_ENV: ${{ needs.setup-and-chunk.outputs.environment_upper }}
-          CMR_TOKEN_PROVIDER: lambda
           CMR_TOKEN_LAMBDA_FUNCTION_NAME: ${{ needs.setup-and-chunk.outputs.environment }}-launchpad_token_dispenser
           CMR_TOKEN_LAMBDA_REGION: us-west-2
           CMR_USER: ${{ secrets.CMR_USER }}

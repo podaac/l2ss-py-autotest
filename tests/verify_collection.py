@@ -24,6 +24,9 @@ VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
 
 assert cfxr, "cf_xarray adds extensions to xarray on import"
 GROUP_DELIM = '__'
+DEFAULT_SPATIAL_BBOX_SCALE = 0.95
+DEFAULT_TEMPORAL_FRACTION = 0.5
+CUSTOM_TESTS_DIRNAME = "custom"
 
 
 def fetch_bearer_token_by_provider(env: str, request_session: requests.Session, token_provider: str) -> str:
@@ -81,6 +84,117 @@ def read_skip_list(csv_file):
         reader = csv.reader(f)
         return {row[0].strip() for row in reader}
 
+def normalize_provider_name(name: str) -> str:
+    if not name:
+        return ""
+    return name.strip().upper().replace("-", "_").replace(" ", "_")
+
+
+def parse_provider_from_concept_id(collection_concept_id: str) -> str:
+    if not collection_concept_id or "-" not in collection_concept_id:
+        return ""
+    return normalize_provider_name(collection_concept_id.split("-")[-1])
+
+
+def read_overrides_file(path: str) -> dict:
+    if not path or not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+def resolve_overrides(overrides: dict, collection_concept_id: str) -> dict:
+    if not overrides:
+        return {}
+
+    provider = parse_provider_from_concept_id(collection_concept_id)
+
+    provider_overrides = {}
+    providers = overrides.get("providers", {})
+    if provider:
+        provider_overrides = providers.get(provider, {}) or providers.get(provider.lower(), {}) or providers.get(provider.upper(), {}) or {}
+
+    collection_overrides = {}
+    collections = overrides.get("collections", {})
+    if collection_concept_id in collections:
+        collection_overrides = collections[collection_concept_id] or {}
+    else:
+        # Case-insensitive key matching for convenience
+        for key, value in collections.items():
+            if key.lower() == collection_concept_id.lower():
+                collection_overrides = value or {}
+                break
+
+    group_overrides = {}
+    groups = overrides.get("collection_groups", {}) or {}
+    for _, group in groups.items():
+        members = group.get("members", []) if isinstance(group, dict) else []
+        if collection_concept_id in members:
+            group_overrides.update({k: v for k, v in group.items() if k != "members"})
+
+    # Collection overrides win over provider overrides
+    return {**provider_overrides, **group_overrides, **collection_overrides}
+
+
+def _custom_tests_root() -> pathlib.Path:
+    return pathlib.Path(__file__).parent.joinpath(CUSTOM_TESTS_DIRNAME)
+
+
+def _provider_custom_file(provider: str) -> pathlib.Path:
+    return _custom_tests_root().joinpath("providers", f"{provider}.py")
+
+
+def _collection_custom_file(collection_concept_id: str) -> pathlib.Path:
+    return _custom_tests_root().joinpath("collections", f"{collection_concept_id}.py")
+
+
+def _collection_custom_dir(collection_concept_id: str) -> pathlib.Path:
+    return _custom_tests_root().joinpath("collections", collection_concept_id)
+
+
+def _collection_custom_dir_has_tests(collection_concept_id: str) -> bool:
+    collection_dir = _collection_custom_dir(collection_concept_id)
+    if not collection_dir.exists() or not collection_dir.is_dir():
+        return False
+    for path in collection_dir.rglob("*.py"):
+        if path.name.startswith("test_") or path.name.endswith("_test.py"):
+            return True
+    return False
+
+
+def find_custom_tests(collection_concept_id: str) -> dict:
+    provider = parse_provider_from_concept_id(collection_concept_id)
+    provider_file = _provider_custom_file(provider) if provider else None
+    collection_file = _collection_custom_file(collection_concept_id)
+    has_provider = bool(provider_file and provider_file.exists())
+    has_collection = collection_file.exists() or _collection_custom_dir_has_tests(collection_concept_id)
+    return {
+        "provider": has_provider,
+        "collection": has_collection,
+        "any": has_provider or has_collection,
+    }
+
+
+def should_run_generic(test_kind: str, overrides: dict) -> bool:
+    """
+    Determine whether to run generic tests.
+    Supported override keys (bool):
+      - run_generic (default True)
+      - run_generic_spatial / run_generic_temporal
+      - disable_generic (default False)
+    """
+    if overrides.get("disable_generic") is True:
+        return False
+    if overrides.get("run_generic") is False:
+        return False
+
+    if test_kind == "spatial":
+        if overrides.get("run_generic_spatial") is False:
+            return False
+    if test_kind == "temporal":
+        if overrides.get("run_generic_temporal") is False:
+            return False
+    return True
 
 # Fixture for the first skip list (skip_collections1.csv)
 @pytest.fixture(scope="session")
@@ -97,6 +211,21 @@ def skip_spatial(env):
     path = os.path.join(current_dir, f"skip/skip_spatial_{env}.csv")
     return read_skip_list(path)
 
+@pytest.fixture(scope="session")
+def overrides_file(pytestconfig):
+    configured = pytestconfig.getoption("override_file")
+    if configured:
+        return configured
+    current_dir = os.path.dirname(__file__)
+    return os.path.join(current_dir, "overrides.json")
+
+
+@pytest.fixture(scope="session")
+def overrides(overrides_file):
+    try:
+        return read_overrides_file(overrides_file)
+    except Exception as exc:
+        pytest.fail(f"Unable to read overrides file at {overrides_file}: {exc}")
 
 @pytest.fixture(scope="session")
 def bearer_token_manager(env: str, request_session: requests.Session, token_provider: str):
@@ -214,31 +343,30 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token_mana
             raise
 
 
-def get_half_temporal_extent(start: str, end: str):
+def _parse_umm_datetime(value: str) -> datetime:
+    try:
+        return datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%fZ')
+    except ValueError:
+        return datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ')
+
+
+def get_middle_temporal_extent(start: str, end: str, fraction: float = DEFAULT_TEMPORAL_FRACTION):
     # Adjust the format to handle cases without fractional seconds
-    try:
-        start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%S.%fZ')
-    except ValueError:
-        start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%SZ')
-    
-    try:
-        end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%S.%fZ')
-    except ValueError:
-        end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%SZ')
-    
-    # Calculate the total duration
+    start_dt = _parse_umm_datetime(start)
+    end_dt = _parse_umm_datetime(end)
+
+    if fraction <= 0 or fraction > 1:
+        raise ValueError(f"temporal_fraction must be within (0, 1], got {fraction}")
+
     total_duration = end_dt - start_dt
-    
-    # Calculate the half duration
-    half_duration = total_duration / 2
-    
-    # Calculate the quarter duration (half of the half duration)
-    quarter_duration = half_duration / 2
-    
-    # Determine the new start and end times
-    new_start_dt = start_dt + quarter_duration
-    new_end_dt = end_dt - quarter_duration
-    
+    if total_duration.total_seconds() <= 0:
+        raise ValueError("Invalid temporal range: end time must be after start time")
+
+    keep_duration = total_duration * fraction
+    trim = (total_duration - keep_duration) / 2
+    new_start_dt = start_dt + trim
+    new_end_dt = end_dt - trim
+
     return {"start": new_start_dt, "end": new_end_dt, "stop": new_end_dt}
 
 
@@ -478,17 +606,30 @@ def walk_netcdf_groups(subsetted_filepath, lat_var_name):
 
 @pytest.mark.timeout(1200)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_spatial):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_spatial, overrides):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
 
-    if collection_concept_id in skip_spatial:
+    collection_overrides = resolve_overrides(overrides, collection_concept_id)
+    if not should_run_generic("spatial", collection_overrides):
+        pytest.skip(f"Generic spatial disabled for {collection_concept_id}")
+
+    custom_tests = find_custom_tests(collection_concept_id)
+    if custom_tests.get("collection") and not collection_overrides.get("also_run_generic", False):
+        pytest.skip(f"Custom collection tests present; skipping generic spatial for {collection_concept_id}")
+    if custom_tests.get("provider") and collection_overrides.get("replace_generic", False):
+        pytest.skip(f"Custom provider tests present; skipping generic spatial for {collection_concept_id}")
+
+    if collection_overrides.get("skip_spatial"):
+        pytest.skip(f"Spatial override skip for {collection_concept_id}")
+    if collection_concept_id in skip_spatial and not collection_overrides.get("force_spatial"):
         pytest.skip(f"Known collection to skip for spatial testing {collection_concept_id}")
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
 
     # Compute a box that is smaller than the granule extent bounding box
     north, south, east, west = get_bounding_box(granule_json)
-    east, west, north, south = create_smaller_bounding_box(east, west, north, south, .95)
+    spatial_scale = collection_overrides.get("spatial_bbox_scale", DEFAULT_SPATIAL_BBOX_SCALE)
+    east, west, north, south = create_smaller_bounding_box(east, west, north, south, float(spatial_scale))
 
     start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
     end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
@@ -616,15 +757,28 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
 @pytest.mark.timeout(1200)
 def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_temporal):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_temporal, overrides):
     test_spatial_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
 
-    if collection_concept_id in skip_temporal:
+    collection_overrides = resolve_overrides(overrides, collection_concept_id)
+    if not should_run_generic("temporal", collection_overrides):
+        pytest.skip(f"Generic temporal disabled for {collection_concept_id}")
+
+    custom_tests = find_custom_tests(collection_concept_id)
+    if custom_tests.get("collection") and not collection_overrides.get("also_run_generic", False):
+        pytest.skip(f"Custom collection tests present; skipping generic temporal for {collection_concept_id}")
+    if custom_tests.get("provider") and collection_overrides.get("replace_generic", False):
+        pytest.skip(f"Custom provider tests present; skipping generic temporal for {collection_concept_id}")
+
+    if collection_overrides.get("skip_temporal"):
+        pytest.skip(f"Temporal override skip for {collection_concept_id}")
+    if collection_concept_id in skip_temporal and not collection_overrides.get("force_temporal"):
         pytest.skip(f"Known collection to skip for temporal testing {collection_concept_id}")
 
     start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
     end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
-    temporal_subset = get_half_temporal_extent(start_time, end_time)
+    temporal_fraction = collection_overrides.get("temporal_fraction", DEFAULT_TEMPORAL_FRACTION)
+    temporal_subset = get_middle_temporal_extent(start_time, end_time, float(temporal_fraction))
     
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection,
@@ -646,4 +800,3 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
                 logging.info("Auth error while running Harmony request. Refreshing token and retrying once.")
                 continue
             raise
-

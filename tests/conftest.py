@@ -54,6 +54,12 @@ def pytest_addoption(parser):
         default=os.environ.get("CMR_TOKEN_PROVIDER", "direct"),
         help="Token source: direct EDL token API or Lambda token provider",
     )
+    parser.addoption(
+        "--override-file",
+        action="store",
+        default=os.environ.get("L2SS_OVERRIDES_FILE"),
+        help="Path to JSON overrides for per-provider or per-collection test behavior",
+    )
 
     group = parser.getgroup('test_mode')
     group.addoption("--concept_id", action="store", help="Concept ID of single collection to test")

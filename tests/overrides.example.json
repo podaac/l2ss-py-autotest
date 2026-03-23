@@ -1,0 +1,29 @@
+{
+  "providers": {
+    "GES_DISC": {
+      "skip_temporal": true,
+      "spatial_bbox_scale": 0.9
+    }
+  },
+  "collections": {
+    "C1234567890-GES_DISC": {
+      "skip_spatial": true,
+      "run_generic": false
+    },
+    "C9876543210-GES_DISC": {
+      "force_temporal": true,
+      "temporal_fraction": 0.25
+    }
+  },
+  "collection_groups": {
+    "GES_DISC_SPECIAL": {
+      "members": [
+        "C1234567890-GES_DISC",
+        "C1111111111-GES_DISC"
+      ],
+      "skip_temporal": true,
+      "run_generic_temporal": false,
+      "spatial_bbox_scale": 0.9
+    }
+  }
+}
