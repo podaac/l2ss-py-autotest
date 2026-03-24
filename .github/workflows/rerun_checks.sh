@@ -10,26 +10,30 @@ for pr_number in $pr_numbers; do
     gh pr merge --merge --auto $pr_number
 done
 
-gh pr list --state open --label $1 --limit 500 >branches.list
-#git branch -r >branches.list
+gh pr list --state open --label "$1" --json number,headRefName,headRepository | \
+  jq -r '.[] | select(.headRepository.isFork==false) | "\(.number)\t\(.headRefName)"' >branches.list
 
-#cat branches.list
-cat branches.list|grep diff\/ |sed 's|^.*diff/|diff/|g' |sed 's|\t.*||g' >branches2.list
-#cat branches.list|grep \/diff\/ |sed 's|^.*(diff/.*?)\s/.*$|$1|g' >branches2.list
-cat branches2.list                
+cat branches.list
 
 #git config --global user.email ${{ github.actor }}@users.noreply.github.com
 #git config --global user.name "${{ github.actor }}"
 
-while read branch; do
-  echo "Branch: $branch"
-  git checkout $branch
-  git pull origin $branch
-  git merge main
+while IFS=$'\t' read pr_number branch; do
+  if [ -z "$branch" ]; then
+    continue
+  fi
+  echo "PR: $pr_number Branch: $branch"
+  git fetch origin "$branch"
+  git checkout -B "$branch" "origin/$branch"
+  git fetch origin main
+  if ! git merge origin/main; then
+    echo "Merge conflict on $branch; aborting merge and continuing with empty commit."
+    git merge --abort || true
+  fi
   echo "git commit --allow-empty -m 'Triggering Autotest Workflow Re-Run'"
   git commit --allow-empty -m 'Triggering Autotest Workflow Re-Run'
   echo "git push origin $branch"
-  git push origin $branch
-done <branches2.list  
+  git push origin "$branch"
+done <branches.list
 
-rm branches*.list
+rm -f branches.list
