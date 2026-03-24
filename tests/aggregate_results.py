@@ -3,40 +3,19 @@ import json
 import os
 import requests
 import time
-import boto3
 import re
-from requests.auth import HTTPBasicAuth
 import textwrap
-from botocore.config import Config
 from datetime import datetime
 from podaac_agents.agents.stack_trace_agent import stack_trace_agent
 import cmr
+from token_utils import fetch_bearer_token_by_provider
 
-def bearer_token(env):
-
-    # Try to get token from environment variable first
-    token = os.environ.get("CMR_BEARER_TOKEN")
-    if token:
-        return token
-
-    env = env.lower()
-    url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
-
+def bearer_token(env, token_provider="direct"):
     try:
-        # Make the request with the Base64-encoded Authorization header
-        resp = requests.post(
-            url,
-            auth=HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS'])
-        )
-
-        # Check for successful response
-        if resp.status_code == 200:
-            response_content = resp.json()
-            return response_content.get('access_token')
-
+        return fetch_bearer_token_by_provider(env, token_provider)
     except Exception as e:
-        status_code = resp.status_code if 'resp' in locals() and resp else "N/A"
-        print(f"Error getting the token (status code {status_code}): {e}")
+        print(f"Error getting bearer token: {e}")
+        return None
 
 
 def get_associations(token, env):
@@ -168,6 +147,25 @@ def format_message(msg, max_lines=30):
     if len(lines) > max_lines:
         lines = lines[:max_lines] + ['... (truncated) ...']
     return "\n".join(lines)
+
+
+def extract_labels_from_message(message):
+    """
+    Extract GitHub labels from a failed test message.
+    """
+    labels = []
+    message = str(message or "")
+    if "No granules found" in message:
+        labels.append("No Granules")
+    if "There are no umm-v associated with this collection" in message:
+        labels.append("No UMM-V")
+    if re.search(r"Failed: Timeout \(>\d+(\.\d+)?s\) from pytest-timeout", message):
+        labels.append("Timeout")
+    if "Unable to download" in message:
+        labels.append("Forbidden")
+    if "Could not determine time variable" in message:
+        labels.append("No Time Var")
+    return labels
 
 
 def bedrock_summarize_error(runtime, error_message):
@@ -380,7 +378,7 @@ def get_collection_names(providers, env, collections_list):
     elif lower_env == "ops":
         url = "https://graphql.earthdata.nasa.gov/api"
 
-    token = bearer_token(env)
+    token = bearer_token(env, os.environ.get("CMR_TOKEN_PROVIDER", "direct").lower())
 
     headers = {
         "Content-Type": "application/json",
@@ -536,6 +534,7 @@ def process_one_failure(
     section is the markdown block for the aggregated body; caller uses it to build error_sections.
     """
     fail["message"] = format_message(fail["message"])
+    error_labels = extract_labels_from_message(fail["message"])
     concept_id = fail.get("concept_id", "")
     short_name = collection_names.get(concept_id, "Unknown Collection")
     test_type = fail.get("test_type", "")
@@ -593,9 +592,19 @@ def process_one_failure(
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
         body_md = f"**Updated:** {timestamp}\n\nJob URL: {url}\n\n" + section
         issue = get_github_issue_by_title(repo, token, title)
+        issue_labels = [label] + error_labels
         if not issue:
-            create_github_issue(repo, token, title, body_md, labels=[label])
+            create_github_issue(repo, token, title, body_md, labels=issue_labels)
             issue = get_github_issue_by_title(repo, token, title)
+        elif issue.get("number") is not None:
+            create_or_update_github_issue(
+                repo,
+                token,
+                title,
+                body_md,
+                labels=issue_labels,
+                issue_number=issue.get("number"),
+            )
         if issue:
             issue_url = issue.get("html_url")
             issue_number = issue.get("number")
@@ -604,6 +613,7 @@ def process_one_failure(
         "concept_id": concept_id,
         "test_type": fail.get("test_type", ""),
         "message": fail.get("message", "").strip(),
+        "labels": error_labels,
         "solution": solution,
         "job_url": url,
         "issue_url": issue_url,
@@ -687,7 +697,8 @@ def process_failed_job_file(
     if repo and token and concept_id and concept_id in current_associations:
         short_name = collection_names.get(concept_id, "Unknown Collection")
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
-        create_or_update_github_issue(repo, token, title, body_md, labels=[label])
+        error_labels = extract_labels_from_message(pretty_reason)
+        create_or_update_github_issue(repo, token, title, body_md, labels=[label] + error_labels)
 
     return True
 
@@ -746,9 +757,10 @@ def main():
     repo = os.environ.get("GITHUB_REPOSITORY")
     token = os.environ.get("GITHUB_TOKEN")
     env = os.environ.get("REGRESSION_ENV", "uat")
+    token_provider = os.environ.get("CMR_TOKEN_PROVIDER", "direct").lower()
     label = f"regression-failure-{env}"
 
-    edl_token = bearer_token(env)
+    edl_token = bearer_token(env, token_provider)
     current_associations = load_current_associations(edl_token, env)
 
     # --- First pass: collect concept_ids and providers from failed jobs (for GraphQL lookup) ---
