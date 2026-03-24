@@ -146,10 +146,17 @@ jobs:
               echo "CMR_BEARER_TOKEN=${{ secrets.OPS_URS_TOKEN }}" >> $GITHUB_ENV
               ;;
             *)
-              echo "❌ Unknown environment: ${{ needs.setup-and-chunk.outputs.environment_upper }}" >&2
+              echo "❌ Unknown environment: ${{ inputs.environment }}" >&2
               exit 1
               ;;
           esac
+
+      - name: Configure AWS credentials for UAT
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
+          aws-region: us-west-2
 
       - name: Aggregate failed jobs and print URLs and reasons
         env:
@@ -159,6 +166,5 @@ jobs:
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CMR_BEARER_TOKEN: ${{ env.CMR_BEARER_TOKEN }}
         run: |
           poetry run python tests/aggregate_results.py

@@ -84,12 +84,25 @@ jobs:
           app_id: ${{ secrets.CICD_APP_ID }}
           private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v4
+      - name: Check for existing PR
+        id: existing_pr
+        env:
+          GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
+        run: |
+          pr_count=$(gh pr list --head "diff/uat/${{ matrix.data.concept_id }}" --state open --json number --jq 'length')
+          if [ "$pr_count" -gt 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Update uat_associations
+        if: steps.existing_pr.outputs.exists != 'true'
         run: |
           mkdir -p $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat
           echo "${{ matrix.data.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/uat/${{ matrix.data.concept_id }}
       - name: Create Pull Request for ${{ env.SHORT_NAME }}
         id: cpr
+        if: steps.existing_pr.outputs.exists != 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ steps.podaac-cicd.outputs.token }}
@@ -106,6 +119,7 @@ jobs:
             unverified
             autotest
       - name: Enable Pull Request Automerge
+        if: steps.existing_pr.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
@@ -128,12 +142,25 @@ jobs:
           app_id: ${{ secrets.CICD_APP_ID }}
           private_key: ${{ secrets.CICD_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v4
+      - name: Check for existing PR
+        id: existing_pr
+        env:
+          GH_TOKEN: ${{ steps.podaac-cicd.outputs.token }}
+        run: |
+          pr_count=$(gh pr list --head "diff/ops/${{ matrix.data.concept_id }}" --state open --json number --jq 'length')
+          if [ "$pr_count" -gt 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Update ops_associations
+        if: steps.existing_pr.outputs.exists != 'true'
         run: |
           mkdir -p $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops
           echo "${{ matrix.data.concept_id }}" > $GITHUB_WORKSPACE/tests/cmr/l2ss-py/ops/${{ matrix.data.concept_id }}
       - name: Create Pull Request for ${{ env.SHORT_NAME }}
         id: cpr
+        if: steps.existing_pr.outputs.exists != 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ steps.podaac-cicd.outputs.token }}
@@ -150,6 +177,7 @@ jobs:
             unverified
             autotest
       - name: Enable Pull Request Automerge
+        if: steps.existing_pr.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh pr merge --merge --auto ${{ steps.cpr.outputs.pull-request-number }}
