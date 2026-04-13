@@ -107,7 +107,7 @@ def get_existing_issue_number(env):
         return "3497"
 
 
-def create_issue(repo_name, issue_title, issue_body, github_token):
+def create_issue(repo_name, issue_title, issue_body, github_token, labels=None):
     url = f"https://api.github.com/repos/{repo_name}/issues"
 
     headers = {
@@ -120,13 +120,16 @@ def create_issue(repo_name, issue_title, issue_body, github_token):
         'body': issue_body
     }
 
+    if labels:
+        payload['labels'] = labels
+
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
     print(f"Issue created successfully: {response.json()['html_url']}")
 
 
-def update_issue(repo_name, issue_number, issue_body, github_token):
+def update_issue(repo_name, issue_number, issue_body, github_token, labels=None):
     url = f"https://api.github.com/repos/{repo_name}/issues/{issue_number}"
 
     headers = {
@@ -137,6 +140,9 @@ def update_issue(repo_name, issue_number, issue_body, github_token):
     payload = {
         'body': issue_body
     }
+
+    if labels:
+        payload['labels'] = labels
 
     response = requests.patch(url, headers=headers, json=payload)
     response.raise_for_status()
@@ -234,10 +240,10 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
     if existing_issue_number:
         # Update the existing issue
         update_issue(repo_name, existing_issue_number,
-                     issue_body, github_token)
+                     issue_body, github_token, labels=["team:tva"])
     else:
         # Create a new issue
-        create_issue(repo_name, issue_title, issue_body, github_token)
+        create_issue(repo_name, issue_title, issue_body, github_token, labels=["team:tva"])
 
 if __name__ == "__main__":
     # Get repository and token from environment variables
