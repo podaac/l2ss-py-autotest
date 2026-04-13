@@ -20,6 +20,17 @@ Or a folder with multiple tests:
 
 `tests/custom/collections/<CONCEPT_ID>/test_*.py`
 
+### Environment-specific collections
+If you need UAT/OPS separation, you can use env-specific folders:
+
+`tests/custom/collections/uat/<CONCEPT_ID>.py`
+`tests/custom/collections/ops/<CONCEPT_ID>.py`
+
+Or folders with multiple tests:
+
+`tests/custom/collections/uat/<CONCEPT_ID>/test_*.py`
+`tests/custom/collections/ops/<CONCEPT_ID>/test_*.py`
+
 ## Skipping generic tests
 By default:
 - If a collection-level custom test exists, generic spatial/temporal tests are skipped.
@@ -53,6 +64,15 @@ To run both custom and generic for a collection, add:
 You can apply one override block to multiple collections:
 
 ```
+
+### Environment-specific groups
+You can separate groups by environment:
+
+`tests/custom/groups/uat/<GROUP_NAME>/concept_ids.json`
+`tests/custom/groups/uat/<GROUP_NAME>/test_*.py`
+
+`tests/custom/groups/ops/<GROUP_NAME>/concept_ids.json`
+`tests/custom/groups/ops/<GROUP_NAME>/test_*.py`
 {
   "collection_groups": {
     "GES_DISC_SPECIAL": {

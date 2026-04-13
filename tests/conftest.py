@@ -166,7 +166,7 @@ def pytest_collection_modifyitems(config, items):
     if not concept_id:
         return
 
-    custom = find_custom_tests(concept_id)
+    custom = find_custom_tests(concept_id, config.getoption("env"))
     if not custom.get("any"):
         return
 

@@ -141,29 +141,51 @@ def _custom_tests_root() -> pathlib.Path:
     return pathlib.Path(__file__).parent.joinpath(CUSTOM_TESTS_DIRNAME)
 
 
+def _normalize_env(env: str) -> str:
+    if not env:
+        return ""
+    env = str(env).strip().lower()
+    return env if env in {"uat", "ops"} else ""
+
+
 def _custom_groups_root() -> pathlib.Path:
     return _custom_tests_root().joinpath(CUSTOM_GROUPS_DIRNAME)
+
+
+def _env_groups_root(env: str) -> pathlib.Path:
+    env = _normalize_env(env)
+    return _custom_groups_root().joinpath(env) if env else _custom_groups_root()
 
 
 def _provider_custom_file(provider: str) -> pathlib.Path:
     return _custom_tests_root().joinpath("providers", f"{provider}.py")
 
 
-def _collection_custom_file(collection_concept_id: str) -> pathlib.Path:
-    return _custom_tests_root().joinpath("collections", f"{collection_concept_id}.py")
+def _collection_custom_file_candidates(collection_concept_id: str, env: str) -> list:
+    env = _normalize_env(env)
+    base = _custom_tests_root().joinpath("collections", f"{collection_concept_id}.py")
+    if not env:
+        return [base]
+    env_path = _custom_tests_root().joinpath("collections", env, f"{collection_concept_id}.py")
+    return [env_path, base]
 
 
-def _collection_custom_dir(collection_concept_id: str) -> pathlib.Path:
-    return _custom_tests_root().joinpath("collections", collection_concept_id)
+def _collection_custom_dir_candidates(collection_concept_id: str, env: str) -> list:
+    env = _normalize_env(env)
+    base = _custom_tests_root().joinpath("collections", collection_concept_id)
+    if not env:
+        return [base]
+    env_path = _custom_tests_root().joinpath("collections", env, collection_concept_id)
+    return [env_path, base]
 
 
-def _collection_custom_dir_has_tests(collection_concept_id: str) -> bool:
-    collection_dir = _collection_custom_dir(collection_concept_id)
-    if not collection_dir.exists() or not collection_dir.is_dir():
-        return False
-    for path in collection_dir.rglob("*.py"):
-        if path.name.startswith("test_") or path.name.endswith("_test.py"):
-            return True
+def _collection_custom_dir_has_tests(collection_concept_id: str, env: str) -> bool:
+    for collection_dir in _collection_custom_dir_candidates(collection_concept_id, env):
+        if not collection_dir.exists() or not collection_dir.is_dir():
+            continue
+        for path in collection_dir.rglob("*.py"):
+            if path.name.startswith("test_") or path.name.endswith("_test.py"):
+                return True
     return False
 
 
@@ -195,27 +217,46 @@ def _group_dir_has_tests(group_dir: pathlib.Path) -> bool:
     return False
 
 
-def _matching_group_dirs(collection_concept_id: str) -> list:
-    root = _custom_groups_root()
-    if not root.exists() or not root.is_dir():
-        return []
+def _matching_group_dirs(collection_concept_id: str, env: str) -> list:
+    env_root = _env_groups_root(env)
     matches = []
-    for group_dir in sorted(root.iterdir()):
-        if not group_dir.is_dir():
-            continue
-        members = _load_group_concept_ids(group_dir)
-        if collection_concept_id in members and _group_dir_has_tests(group_dir):
-            matches.append(group_dir)
+    env_group_names = set()
+    if env_root.exists() and env_root.is_dir():
+        for group_dir in sorted(env_root.iterdir()):
+            if not group_dir.is_dir():
+                continue
+            env_group_names.add(group_dir.name)
+            members = _load_group_concept_ids(group_dir)
+            if collection_concept_id in members and _group_dir_has_tests(group_dir):
+                matches.append(group_dir)
+
+    base_root = _custom_groups_root()
+    if base_root.exists() and base_root.is_dir():
+        for group_dir in sorted(base_root.iterdir()):
+            if not group_dir.is_dir():
+                continue
+            if group_dir.name in env_group_names:
+                continue
+            members = _load_group_concept_ids(group_dir)
+            if collection_concept_id in members and _group_dir_has_tests(group_dir):
+                matches.append(group_dir)
     return matches
 
 
-def find_custom_tests(collection_concept_id: str) -> dict:
+def _first_existing_path(candidates: list) -> pathlib.Path:
+    for path in candidates:
+        if path.exists():
+            return path
+    return None
+
+
+def find_custom_tests(collection_concept_id: str, env: str) -> dict:
     provider = parse_provider_from_concept_id(collection_concept_id)
     provider_file = _provider_custom_file(provider) if provider else None
-    collection_file = _collection_custom_file(collection_concept_id)
+    collection_file = _first_existing_path(_collection_custom_file_candidates(collection_concept_id, env))
     has_provider = bool(provider_file and provider_file.exists())
-    has_collection = collection_file.exists() or _collection_custom_dir_has_tests(collection_concept_id)
-    group_dirs = _matching_group_dirs(collection_concept_id)
+    has_collection = collection_file.exists() or _collection_custom_dir_has_tests(collection_concept_id, env)
+    group_dirs = _matching_group_dirs(collection_concept_id, env)
     has_group = bool(group_dirs)
     return {
         "provider": has_provider,
@@ -246,10 +287,10 @@ def _load_custom_test_functions(path: pathlib.Path):
     return functions
 
 
-def _load_custom_dir_test_functions(collection_concept_id: str):
+def _load_custom_dir_test_functions(collection_concept_id: str, env: str):
     functions = []
-    collection_dir = _collection_custom_dir(collection_concept_id)
-    if not collection_dir.exists() or not collection_dir.is_dir():
+    collection_dir = _first_existing_path(_collection_custom_dir_candidates(collection_concept_id, env))
+    if not collection_dir or not collection_dir.exists() or not collection_dir.is_dir():
         return functions
     for path in collection_dir.rglob("*.py"):
         if path.name.startswith("test_") or path.name.endswith("_test.py"):
@@ -257,26 +298,26 @@ def _load_custom_dir_test_functions(collection_concept_id: str):
     return functions
 
 
-def _load_group_test_functions(collection_concept_id: str):
+def _load_group_test_functions(collection_concept_id: str, env: str):
     functions = []
-    for group_dir in _matching_group_dirs(collection_concept_id):
+    for group_dir in _matching_group_dirs(collection_concept_id, env):
         for path in group_dir.rglob("*.py"):
             if path.name.startswith("test_") or path.name.endswith("_test.py"):
                 functions.extend(_load_custom_test_functions(path))
     return functions
 
 
-def _run_custom_tests_for_collection(collection_concept_id: str, request):
+def _run_custom_tests_for_collection(collection_concept_id: str, env: str, request):
     import inspect
     provider = parse_provider_from_concept_id(collection_concept_id)
     provider_file = _provider_custom_file(provider) if provider else None
-    collection_file = _collection_custom_file(collection_concept_id)
+    collection_file = _first_existing_path(_collection_custom_file_candidates(collection_concept_id, env))
 
     functions = []
     functions.extend(_load_custom_test_functions(collection_file))
-    functions.extend(_load_custom_dir_test_functions(collection_concept_id))
+    functions.extend(_load_custom_dir_test_functions(collection_concept_id, env))
     if not functions:
-        functions.extend(_load_group_test_functions(collection_concept_id))
+        functions.extend(_load_group_test_functions(collection_concept_id, env))
     if not functions:
         functions.extend(_load_custom_test_functions(provider_file))
 
@@ -294,8 +335,8 @@ def _run_custom_tests_for_collection(collection_concept_id: str, request):
 
 
 @pytest.mark.timeout(1200)
-def test_custom_collection_or_provider(collection_concept_id, request):
-    _run_custom_tests_for_collection(collection_concept_id, request)
+def test_custom_collection_or_provider(collection_concept_id, env, request):
+    _run_custom_tests_for_collection(collection_concept_id, env, request)
 
 
 def should_run_generic(test_kind: str, overrides: dict) -> bool:
@@ -736,7 +777,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     if not should_run_generic("spatial", collection_overrides):
         pytest.skip(f"Generic spatial disabled for {collection_concept_id}")
 
-    custom_tests = find_custom_tests(collection_concept_id)
+    custom_tests = find_custom_tests(collection_concept_id, env)
     if (custom_tests.get("collection") or custom_tests.get("group")) and not collection_overrides.get("also_run_generic", False):
         pytest.skip(f"Custom collection/group tests present; skipping generic spatial for {collection_concept_id}")
     if custom_tests.get("provider") and collection_overrides.get("replace_generic", False):
@@ -887,7 +928,7 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
     if not should_run_generic("temporal", collection_overrides):
         pytest.skip(f"Generic temporal disabled for {collection_concept_id}")
 
-    custom_tests = find_custom_tests(collection_concept_id)
+    custom_tests = find_custom_tests(collection_concept_id, env)
     if (custom_tests.get("collection") or custom_tests.get("group")) and not collection_overrides.get("also_run_generic", False):
         pytest.skip(f"Custom collection/group tests present; skipping generic temporal for {collection_concept_id}")
     if custom_tests.get("provider") and collection_overrides.get("replace_generic", False):
