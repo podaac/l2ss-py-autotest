@@ -6,6 +6,11 @@ from groq import Groq
 import time
 from requests.auth import HTTPBasicAuth
 
+DAAC_ASSIGNEES={
+    "POCLOUD": "tloubrieu-jpl",
+    "GES_DISC": "tloubrieu-jpl",
+}
+
 
 def bearer_token(env):
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
@@ -107,7 +112,7 @@ def get_existing_issue_number(env):
         return "3497"
 
 
-def create_issue(repo_name, issue_title, issue_body, github_token, labels=None):
+def create_issue(repo_name, issue_title, issue_body, github_token, labels=None, assignees=None):
     url = f"https://api.github.com/repos/{repo_name}/issues"
 
     headers = {
@@ -123,13 +128,16 @@ def create_issue(repo_name, issue_title, issue_body, github_token, labels=None):
     if labels:
         payload['labels'] = labels
 
+    if assignees:
+        payload['assignees'] = assignees if isinstance(assignees, list) else [assignees]
+
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
     print(f"Issue created successfully: {response.json()['html_url']}")
 
 
-def update_issue(repo_name, issue_number, issue_body, github_token, labels=None):
+def update_issue(repo_name, issue_number, issue_body, github_token, labels=None, assignees=None):
     url = f"https://api.github.com/repos/{repo_name}/issues/{issue_number}"
 
     headers = {
@@ -143,6 +151,9 @@ def update_issue(repo_name, issue_number, issue_body, github_token, labels=None)
 
     if labels:
         payload['labels'] = labels
+
+    if assignees:
+        payload['assignees'] = assignees if isinstance(assignees, list) else [assignees]
 
     response = requests.patch(url, headers=headers, json=payload)
     response.raise_for_status()
@@ -175,6 +186,11 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
     )
 
     upper_env = env.upper()
+    assignee = None
+    for key, value in DAAC_ASSIGNEES.items():
+        if key in upper_env:
+            assignee = value
+            break
     issue_title = f"Regression test for {upper_env} ISSUES"
 
     results_file = f'{env}_regression_results.json'
@@ -240,10 +256,10 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
     if existing_issue_number:
         # Update the existing issue
         update_issue(repo_name, existing_issue_number,
-                     issue_body, github_token, labels=["team:tva"])
+                     issue_body, github_token, labels=["team:tva"], assignees=assignee)
     else:
         # Create a new issue
-        create_issue(repo_name, issue_title, issue_body, github_token, labels=["team:tva"])
+        create_issue(repo_name, issue_title, issue_body, github_token, labels=["team:tva"], assignees=assignee)
 
 if __name__ == "__main__":
     # Get repository and token from environment variables
