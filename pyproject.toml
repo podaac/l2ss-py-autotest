@@ -24,7 +24,7 @@ junitparser = "^3.2.0"
 podaac-agents = {git = "https://github.com/podaac/podaac-agents.git"}
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.1"
+pytest = ">=8.2.1,<10.0.0"
 pytest-html = "^4.1.1"
 pytest-timeout = "^2.1.0"
 
