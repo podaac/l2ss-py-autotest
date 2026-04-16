@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 import cmr
 
+
 def bearer_token(env):
     tokens = []
     headers: dict = {'Accept': 'application/json'}
@@ -13,8 +14,8 @@ def bearer_token(env):
     try:
         resp = requests.get(url + "/tokens", headers=headers,
                                    auth=requests.auth.HTTPBasicAuth(os.environ['CMR_USER'], os.environ['CMR_PASS']))
-        response_content = json.loads(resp.content)
 
+        response_content = json.loads(resp.content)
         for x in response_content:
             tokens.append(x['access_token'])
 
