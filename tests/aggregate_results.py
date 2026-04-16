@@ -5,15 +5,17 @@ import requests
 import time
 import re
 import textwrap
+import yaml
 from datetime import datetime
 from podaac_agents.agents.stack_trace_agent import stack_trace_agent
 import cmr
 from token_utils import fetch_bearer_token_by_provider
 
-DAAC_ASSIGNEES={
-    "POCLOUD": "tloubrieu-jpl",
-    "GES_DISC": "tloubrieu-jpl",
-}
+# Load DAAC assignees from config file
+config_path = os.path.join(os.path.dirname(__file__), 'config.yml')
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+DAAC_ASSIGNEES = config.get('assignees', {})
 
 TEAM_TVA_LABEL = "team:tva"
 

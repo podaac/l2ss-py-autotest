@@ -6,7 +6,7 @@ from groq import Groq
 import time
 from requests.auth import HTTPBasicAuth
 
-from .aggregate_results import TEAM_TVA_LABEL
+from aggregate_results import TEAM_TVA_LABEL
 
 
 def bearer_token(env):
