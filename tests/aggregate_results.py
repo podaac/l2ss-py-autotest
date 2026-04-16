@@ -10,6 +10,13 @@ from podaac_agents.agents.stack_trace_agent import stack_trace_agent
 import cmr
 from token_utils import fetch_bearer_token_by_provider
 
+DAAC_ASSIGNEES={
+    "POCLOUD": "tloubrieu-jpl",
+    "GES_DISC": "tloubrieu-jpl",
+}
+
+TEAM_TVA_LABEL = "team:tva"
+
 def bearer_token(env, token_provider="direct"):
     try:
         return fetch_bearer_token_by_provider(env, token_provider)
@@ -48,7 +55,7 @@ def get_associations(token, env):
     return collections
 
 
-def create_github_issue(repo, token, title, body, labels=None):
+def create_github_issue(repo, token, title, body, labels=None, assignees=None):
     url = f"https://api.github.com/repos/{repo}/issues"
     headers = {
         "Authorization": f"token {token}",
@@ -60,6 +67,10 @@ def create_github_issue(repo, token, title, body, labels=None):
     }
     if labels:
         data["labels"] = labels
+
+    if assignees:
+        data["assignees"] = assignees
+
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 201:
         print(f"Created issue: {title}")
@@ -113,7 +124,7 @@ def get_github_issue_by_title(repo, token, title, max_retries=5, delay=2):
     return None
 
 
-def create_or_update_github_issue(repo, token, title, body, labels=None, issue_number=None):
+def create_or_update_github_issue(repo, token, title, body, labels=None, issue_number=None, assignees=None):
     if issue_number is None:
         existing_issue = get_github_issue_by_title(repo, token, title)
     else:
@@ -130,6 +141,10 @@ def create_or_update_github_issue(repo, token, title, body, labels=None, issue_n
         data = {"body": body}
         if labels:
             data["labels"] = labels
+
+        if assignees:
+            data["assignees"] = assignees
+
         response = requests.patch(url, headers=headers, json=data)
         if response.status_code == 200:
             print(f"Updated issue: {title}")
@@ -592,9 +607,16 @@ def process_one_failure(
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
         body_md = f"**Updated:** {timestamp}\n\nJob URL: {url}\n\n" + section
         issue = get_github_issue_by_title(repo, token, title)
-        issue_labels = [label] + error_labels
+        issue_labels = [label] + error_labels + TEAM_TVA_LABEL
+
+        assignee = None
+        for key, value in DAAC_ASSIGNEES.items():
+            if key in concept_id:
+                assignee = value
+                break
+
         if not issue:
-            create_github_issue(repo, token, title, body_md, labels=issue_labels)
+            create_github_issue(repo, token, title, body_md, labels=issue_labels, assignees=[assignee])
             issue = get_github_issue_by_title(repo, token, title)
         elif issue.get("number") is not None:
             create_or_update_github_issue(
@@ -604,6 +626,7 @@ def process_one_failure(
                 body_md,
                 labels=issue_labels,
                 issue_number=issue.get("number"),
+                assignees=[assignee]
             )
         if issue:
             issue_url = issue.get("html_url")
