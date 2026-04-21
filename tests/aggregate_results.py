@@ -345,7 +345,8 @@ def create_aggregated_github_issue(repo, token, all_failures, env, collection_na
         issue_number = "3973"
     else:
         issue_number = None
-    create_or_update_github_issue(repo, token, title, body, labels=["regression-aggregated"], issue_number=issue_number)
+    labels = ["regression-aggregated", TEAM_TVA_LABEL]
+    create_or_update_github_issue(repo, token, title, body, labels=labels, issue_number=issue_number)
 
 
 def get_all_regression_failure_issues(repo, token, label, state="open", max_pages=10):
@@ -725,7 +726,9 @@ def process_failed_job_file(
         short_name = collection_names.get(concept_id, "Unknown Collection")
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
         error_labels = extract_labels_from_message(pretty_reason)
-        create_or_update_github_issue(repo, token, title, body_md, labels=[label] + error_labels)
+        labels = [label] + error_labels
+        labels.append(TEAM_TVA_LABEL)
+        create_or_update_github_issue(repo, token, title, body_md, labels=labels + error_labels)
 
     return True
 
