@@ -618,7 +618,7 @@ def process_one_failure(
                 assignee = value
                 break
 
-        assignees = [assignee] is assignee else None
+        assignees = [assignee] if assignee else None
         if not issue:
             create_github_issue(repo, token, title, body_md, labels=issue_labels, assignees=assignees)
             issue = get_github_issue_by_title(repo, token, title)
