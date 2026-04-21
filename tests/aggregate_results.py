@@ -153,7 +153,7 @@ def create_or_update_github_issue(repo, token, title, body, labels=None, issue_n
         else:
             print(f"Failed to update issue: {title} (status {response.status_code})\n{response.text}")
     else:
-        create_github_issue(repo, token, title, body, labels)
+        create_github_issue(repo, token, title, body, labels=labels , assignees=assignees)
 
 
 def format_message(msg, max_lines=30):
@@ -618,8 +618,9 @@ def process_one_failure(
                 assignee = value
                 break
 
+        assignees = [assignee] is assignee else None
         if not issue:
-            create_github_issue(repo, token, title, body_md, labels=issue_labels, assignees=[assignee])
+            create_github_issue(repo, token, title, body_md, labels=issue_labels, assignees=assignees)
             issue = get_github_issue_by_title(repo, token, title)
         elif issue.get("number") is not None:
             create_or_update_github_issue(
@@ -629,7 +630,7 @@ def process_one_failure(
                 body_md,
                 labels=issue_labels,
                 issue_number=issue.get("number"),
-                assignees=[assignee]
+                assignees=assignees
             )
         if issue:
             issue_url = issue.get("html_url")
