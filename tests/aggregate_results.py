@@ -609,7 +609,8 @@ def process_one_failure(
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
         body_md = f"**Updated:** {timestamp}\n\nJob URL: {url}\n\n" + section
         issue = get_github_issue_by_title(repo, token, title)
-        issue_labels = [label] + error_labels + TEAM_TVA_LABEL
+        issue_labels = [label] + error_labels
+        issue_labels.append(TEAM_TVA_LABEL)
 
         assignee = None
         for key, value in DAAC_ASSIGNEES.items():
