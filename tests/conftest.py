@@ -64,6 +64,16 @@ def pytest_addoption(parser):
 
     group = parser.getgroup('test_mode')
     group.addoption("--concept_id", action="store", help="Concept ID of single collection to test")
+    group.addoption(
+        "--granule_concept_id",
+        action="store",
+        help="Concept ID of a specific granule to use for testing",
+    )
+    group.addoption(
+        "--bbox",
+        action="store",
+        help="Spatial bounding box for testing, formatted as west,south,east,north",
+    )
     group.addoption("--regression", action="store_true", help="Run tests for all known collection associations")
 
 
@@ -85,6 +95,7 @@ def pytest_generate_tests(metafunc):
 @pytest.fixture(scope="session", autouse=True)
 def log_global_env_facts(record_testsuite_property, request):
     record_testsuite_property("concept_id", request.config.getoption('concept_id'))
+    record_testsuite_property("granule_concept_id", request.config.getoption('granule_concept_id'))
     record_testsuite_property("env", request.config.getoption('env'))
 
 

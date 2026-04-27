@@ -3,7 +3,7 @@ import logging
 import os
 import pathlib
 import shutil
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 
 import cf_xarray as cfxr
@@ -104,6 +104,35 @@ def read_overrides_file(path: str) -> dict:
         return json.load(f)
 
 
+def parse_spatial_bbox(value) -> Optional[Tuple[float, float, float, float]]:
+    if value is None or value == "":
+        return None
+
+    if isinstance(value, dict):
+        keys = ("west", "south", "east", "north")
+        try:
+            return tuple(float(value[key]) for key in keys)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("bbox override must contain west, south, east, and north") from exc
+
+    if isinstance(value, (list, tuple)) and len(value) == 4:
+        try:
+            return tuple(float(part) for part in value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("bbox override must contain numeric west, south, east, north values") from exc
+
+    if isinstance(value, str):
+        parts = [part.strip() for part in value.split(",")]
+        if len(parts) != 4:
+            raise ValueError("bbox must be formatted as west,south,east,north")
+        try:
+            return tuple(float(part) for part in parts)
+        except ValueError as exc:
+            raise ValueError("bbox must be formatted as west,south,east,north with numeric values") from exc
+
+    raise ValueError("bbox must be provided as a comma-separated string, 4-item list, or dict")
+
+
 def resolve_overrides(overrides: dict, collection_concept_id: str) -> dict:
     if not overrides:
         return {}
@@ -135,6 +164,36 @@ def resolve_overrides(overrides: dict, collection_concept_id: str) -> dict:
 
     # Collection overrides win over provider overrides
     return {**provider_overrides, **group_overrides, **collection_overrides}
+
+
+def resolve_spatial_bbox(pytestconfig, collection_overrides: dict) -> Optional[Tuple[float, float, float, float]]:
+    configured = pytestconfig.getoption("bbox")
+    if configured:
+        return parse_spatial_bbox(configured)
+
+    override_bbox = collection_overrides.get("spatial_bbox")
+    if override_bbox is not None:
+        return parse_spatial_bbox(override_bbox)
+
+    return None
+
+
+@pytest.fixture(scope="function")
+def granule_concept_id(pytestconfig, overrides, collection_concept_id):
+    collection_overrides = resolve_overrides(overrides, collection_concept_id)
+    configured = pytestconfig.getoption("granule_concept_id")
+    if configured:
+        return configured
+    override_granule = collection_overrides.get("granule_concept_id")
+    if override_granule:
+        return override_granule
+    return None
+
+
+@pytest.fixture(scope="function")
+def spatial_bbox(pytestconfig, overrides, collection_concept_id):
+    collection_overrides = resolve_overrides(overrides, collection_concept_id)
+    return resolve_spatial_bbox(pytestconfig, collection_overrides)
 
 
 def _custom_tests_root() -> pathlib.Path:
@@ -427,7 +486,7 @@ def authed_request(request_session: requests.Session, bearer_token_manager):
 
 
 @pytest.fixture(scope="function")
-def granule_json(collection_concept_id: str, cmr_mode: str, authed_request) -> dict:
+def granule_json(collection_concept_id: str, cmr_mode: str, authed_request, spatial_bbox, granule_concept_id) -> dict:
     '''
     This fixture defines the strategy used for picking a granule from a collection for testing
 
@@ -441,7 +500,13 @@ def granule_json(collection_concept_id: str, cmr_mode: str, authed_request) -> d
     -------
     umm_json for selected granule
     '''
-    cmr_url = f"{cmr_mode}granules.umm_json?collection_concept_id={collection_concept_id}&sort_key=-start_date&page_size=1"
+    if granule_concept_id:
+        cmr_url = f"{cmr_mode}granules.umm_json?concept_id={granule_concept_id}&page_size=1"
+    else:
+        cmr_url = f"{cmr_mode}granules.umm_json?collection_concept_id={collection_concept_id}&sort_key=-start_date&page_size=1"
+        if spatial_bbox:
+            west, south, east, north = spatial_bbox
+            cmr_url += f"&bounding_box={west},{south},{east},{north}"
 
     response_json = authed_request("GET", cmr_url).json()
 
@@ -770,7 +835,7 @@ def walk_netcdf_groups(subsetted_filepath, lat_var_name):
 
 @pytest.mark.timeout(1200)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_spatial, overrides):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_spatial, overrides, spatial_bbox):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
 
     collection_overrides = resolve_overrides(overrides, collection_concept_id)
@@ -790,8 +855,11 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
 
-    # Compute a box that is smaller than the granule extent bounding box
-    north, south, east, west = get_bounding_box(granule_json)
+    # Compute a box that is smaller than the chosen spatial extent.
+    if spatial_bbox:
+        west, south, east, north = spatial_bbox
+    else:
+        north, south, east, west = get_bounding_box(granule_json)
     spatial_scale = collection_overrides.get("spatial_bbox_scale", DEFAULT_SPATIAL_BBOX_SCALE)
     east, west, north, south = create_smaller_bounding_box(east, west, north, south, float(spatial_scale))
 
