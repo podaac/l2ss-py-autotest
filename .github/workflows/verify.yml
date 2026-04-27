@@ -47,16 +47,30 @@ jobs:
         run: |
           poetry install
 
+      - name: Set CMR bearer token dynamically
+        id: set-cmr-token
+        run: |
+          case "${{ inputs.environment }}" in
+            UAT)
+              echo "CMR_BEARER_TOKEN=${{ secrets.UAT_URS_TOKEN }}" >> $GITHUB_ENV
+              ;;
+            OPS)
+              echo "CMR_BEARER_TOKEN=${{ secrets.OPS_URS_TOKEN }}" >> $GITHUB_ENV
+              ;;
+            *)
+              echo "❌ Unknown environment: ${{ inputs.environment }}" >&2
+              exit 1
+              ;;
+          esac
+
       - name: Execute Tests
         id: run-tests
         working-directory: tests
         env:
           TEST_ENV: ${{ steps.get-env-ccid.outputs.test_env }}
           CONCEPT_ID: ${{ steps.get-env-ccid.outputs.concept_id }}
-          CMR_USER: ${{ secrets.CMR_USER }}
-          CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
-          poetry run pytest verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --token-provider lambda --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
+          poetry run pytest verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
 
       - name: Convert XML to JSON
         id: run-xml-to-json
