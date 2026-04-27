@@ -7,7 +7,7 @@ import create_or_update_issue
 from groq import Groq
 import time
 import re
-from verify_collection import find_custom_tests
+from verify_collection import find_custom_tests, read_overrides_file, resolve_overrides, has_matching_override, should_run_generic
 
 try:
     os.environ['CMR_USER']
@@ -178,15 +178,29 @@ def pytest_collection_modifyitems(config, items):
         return
 
     custom = find_custom_tests(concept_id, config.getoption("env"))
-    if not custom.get("any"):
+    if not (custom.get("collection") or custom.get("group")):
         return
+
+    current_dir = os.path.dirname(__file__)
+    override_file = config.getoption("override_file") or os.path.join(current_dir, "overrides.json")
+    overrides = read_overrides_file(override_file)
+    collection_overrides = resolve_overrides(overrides, concept_id)
+    has_override = has_matching_override(overrides, concept_id) or custom.get("collection") or custom.get("group")
 
     deselected = []
     kept = []
     for item in items:
         base_name = getattr(item, "originalname", None) or item.name
-        if base_name in ("test_spatial_subset", "test_temporal_subset"):
-            deselected.append(item)
+        if base_name == "test_spatial_subset":
+            if should_run_generic("spatial", collection_overrides, has_override):
+                kept.append(item)
+            else:
+                deselected.append(item)
+        elif base_name == "test_temporal_subset":
+            if should_run_generic("temporal", collection_overrides, has_override):
+                kept.append(item)
+            else:
+                deselected.append(item)
         else:
             kept.append(item)
 
