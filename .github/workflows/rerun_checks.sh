@@ -1,8 +1,5 @@
 #!/bin/sh
 
-# Optional: Uncomment the next line (remove the #) to enable deep shell debugging
-# set -x
-
 echo "Starting script. Label argument provided: '$1'"
 
 echo "Fetching all remote branches..."
