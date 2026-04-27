@@ -6,6 +6,8 @@ from groq import Groq
 import time
 from requests.auth import HTTPBasicAuth
 
+from aggregate_results import TEAM_TVA_LABEL
+
 
 def bearer_token(env):
     url = f"https://{'uat.' if env == 'uat' else ''}urs.earthdata.nasa.gov/api/users/find_or_create_token"
@@ -107,7 +109,7 @@ def get_existing_issue_number(env):
         return "3497"
 
 
-def create_issue(repo_name, issue_title, issue_body, github_token):
+def create_issue(repo_name, issue_title, issue_body, github_token, labels=None, assignees=None):
     url = f"https://api.github.com/repos/{repo_name}/issues"
 
     headers = {
@@ -120,13 +122,19 @@ def create_issue(repo_name, issue_title, issue_body, github_token):
         'body': issue_body
     }
 
+    if labels:
+        payload['labels'] = labels
+
+    if assignees:
+        payload['assignees'] = assignees if isinstance(assignees, list) else [assignees]
+
     response = requests.post(url, headers=headers, json=payload)
     response.raise_for_status()
 
     print(f"Issue created successfully: {response.json()['html_url']}")
 
 
-def update_issue(repo_name, issue_number, issue_body, github_token):
+def update_issue(repo_name, issue_number, issue_body, github_token, labels=None, assignees=None):
     url = f"https://api.github.com/repos/{repo_name}/issues/{issue_number}"
 
     headers = {
@@ -137,6 +145,12 @@ def update_issue(repo_name, issue_number, issue_body, github_token):
     payload = {
         'body': issue_body
     }
+
+    if labels:
+        payload['labels'] = labels
+
+    if assignees:
+        payload['assignees'] = assignees if isinstance(assignees, list) else [assignees]
 
     response = requests.patch(url, headers=headers, json=payload)
     response.raise_for_status()
@@ -164,9 +178,10 @@ def summarize_error(client, error_message):
 
 def create_or_update_issue(repo_name, github_token, env, groq_api_key):
 
+
     client = Groq(
         api_key=groq_api_key,
-    )
+    ) if groq_api_key else None
 
     upper_env = env.upper()
     issue_title = f"Regression test for {upper_env} ISSUES"
@@ -209,10 +224,12 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
         for item in failed:
             message = item.get('message')
             try:
-                error_message = summarize_error(client, message)
+                error_message = summarize_error(client, message) if client else message
+                item['error_message'] = error_message
             except Exception:
-                error_message = "Unable to retrieve an error message"
-            item['error_message'] = error_message
+                # fallback to original message if there's an error with the summarization
+                item['error_message'] = message
+
 
             time.sleep(10)
 
@@ -234,17 +251,23 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
     if existing_issue_number:
         # Update the existing issue
         update_issue(repo_name, existing_issue_number,
-                     issue_body, github_token)
+                     issue_body, github_token, labels=[TEAM_TVA_LABEL])
     else:
         # Create a new issue
-        create_issue(repo_name, issue_title, issue_body, github_token)
+        create_issue(
+            repo_name,
+            issue_title,
+            issue_body,
+            github_token,
+            labels=[TEAM_TVA_LABEL]
+        )
 
 if __name__ == "__main__":
     # Get repository and token from environment variables
     repo_name = os.getenv("GITHUB_REPOSITORY")
     github_token = os.getenv("GITHUB_TOKEN")
     env = os.getenv("ENV")
-    groq_api_key = os.getenv("GROQ_API_KEY")
+    groq_api_key = os.getenv("GROQ_API_KEY", "")
 
     # Call the create_or_update_issue function with repository and token
     create_or_update_issue(repo_name, github_token, env, groq_api_key)

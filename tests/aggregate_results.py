@@ -5,10 +5,19 @@ import requests
 import time
 import re
 import textwrap
+import yaml
 from datetime import datetime
 from podaac_agents.agents.stack_trace_agent import stack_trace_agent
 import cmr
 from token_utils import fetch_bearer_token_by_provider
+
+# Load DAAC assignees from config file
+config_path = os.path.join(os.path.dirname(__file__), 'config.yml')
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+DAAC_ASSIGNEES = config.get('assignees', {})
+
+TEAM_TVA_LABEL = "team:tva"
 
 def bearer_token(env, token_provider="direct"):
     try:
@@ -48,7 +57,7 @@ def get_associations(token, env):
     return collections
 
 
-def create_github_issue(repo, token, title, body, labels=None):
+def create_github_issue(repo, token, title, body, labels=None, assignees=None):
     url = f"https://api.github.com/repos/{repo}/issues"
     headers = {
         "Authorization": f"token {token}",
@@ -60,6 +69,10 @@ def create_github_issue(repo, token, title, body, labels=None):
     }
     if labels:
         data["labels"] = labels
+
+    if assignees:
+        data["assignees"] = assignees
+
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 201:
         print(f"Created issue: {title}")
@@ -113,7 +126,7 @@ def get_github_issue_by_title(repo, token, title, max_retries=5, delay=2):
     return None
 
 
-def create_or_update_github_issue(repo, token, title, body, labels=None, issue_number=None):
+def create_or_update_github_issue(repo, token, title, body, labels=None, issue_number=None, assignees=None):
     if issue_number is None:
         existing_issue = get_github_issue_by_title(repo, token, title)
     else:
@@ -130,13 +143,17 @@ def create_or_update_github_issue(repo, token, title, body, labels=None, issue_n
         data = {"body": body}
         if labels:
             data["labels"] = labels
+
+        if assignees:
+            data["assignees"] = assignees
+
         response = requests.patch(url, headers=headers, json=data)
         if response.status_code == 200:
             print(f"Updated issue: {title}")
         else:
             print(f"Failed to update issue: {title} (status {response.status_code})\n{response.text}")
     else:
-        create_github_issue(repo, token, title, body, labels)
+        create_github_issue(repo, token, title, body, labels=labels , assignees=assignees)
 
 
 def format_message(msg, max_lines=30):
@@ -328,7 +345,8 @@ def create_aggregated_github_issue(repo, token, all_failures, env, collection_na
         issue_number = "3973"
     else:
         issue_number = None
-    create_or_update_github_issue(repo, token, title, body, labels=["regression-aggregated"], issue_number=issue_number)
+    labels = ["regression-aggregated", TEAM_TVA_LABEL]
+    create_or_update_github_issue(repo, token, title, body, labels=labels, issue_number=issue_number)
 
 
 def get_all_regression_failure_issues(repo, token, label, state="open", max_pages=10):
@@ -593,8 +611,17 @@ def process_one_failure(
         body_md = f"**Updated:** {timestamp}\n\nJob URL: {url}\n\n" + section
         issue = get_github_issue_by_title(repo, token, title)
         issue_labels = [label] + error_labels
+        issue_labels.append(TEAM_TVA_LABEL)
+
+        assignee = None
+        for key, value in DAAC_ASSIGNEES.items():
+            if key in concept_id:
+                assignee = value
+                break
+
+        assignees = [assignee] if assignee else None
         if not issue:
-            create_github_issue(repo, token, title, body_md, labels=issue_labels)
+            create_github_issue(repo, token, title, body_md, labels=issue_labels, assignees=assignees)
             issue = get_github_issue_by_title(repo, token, title)
         elif issue.get("number") is not None:
             create_or_update_github_issue(
@@ -604,6 +631,7 @@ def process_one_failure(
                 body_md,
                 labels=issue_labels,
                 issue_number=issue.get("number"),
+                assignees=assignees
             )
         if issue:
             issue_url = issue.get("html_url")
@@ -698,7 +726,9 @@ def process_failed_job_file(
         short_name = collection_names.get(concept_id, "Unknown Collection")
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
         error_labels = extract_labels_from_message(pretty_reason)
-        create_or_update_github_issue(repo, token, title, body_md, labels=[label] + error_labels)
+        labels = [label] + error_labels
+        labels.append(TEAM_TVA_LABEL)
+        create_or_update_github_issue(repo, token, title, body_md, labels=labels + error_labels)
 
     return True
 
