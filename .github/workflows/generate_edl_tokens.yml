@@ -1,0 +1,95 @@
+name: Generate EDL Tokens
+
+on:
+  schedule:
+    # Run daily at 12:00 PM Pacific during daylight saving time (19:00 UTC)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-uat-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: 2.3.2
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Generate UAT EDL token
+        id: generate
+        env:
+          EDL_SERVICE_USERNAME: ${{ secrets.EDL_SERVICE_USERNAME }}
+          EDL_SERVICE_PASSWORD: ${{ secrets.EDL_SERVICE_PASSWORD }}
+        run: |
+          token="$(poetry run python scripts/generate_edl_tokens.py uat)"
+          echo "::add-mask::$token"
+          echo "edl_token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Validate UAT EDL token
+        uses: ./.github/actions/check-edl-token
+        with:
+          environment: uat
+          edl-token: ${{ steps.generate.outputs.edl_token }}
+
+      - name: Update UAT secret
+        env:
+          GH_TOKEN: ${{ secrets.L2SS_PY_AUTOTEST_PAT }}
+          TOKEN_VALUE: ${{ steps.generate.outputs.edl_token }}
+        run: |
+          printf '%s' "$TOKEN_VALUE" | gh secret set UAT_URS_TOKEN --repo "$GITHUB_REPOSITORY"
+
+  refresh-ops-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: 2.3.2
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Generate OPS EDL token
+        id: generate
+        env:
+          EDL_SERVICE_USERNAME: ${{ secrets.EDL_SERVICE_USERNAME }}
+          EDL_SERVICE_PASSWORD: ${{ secrets.EDL_SERVICE_PASSWORD }}
+        run: |
+          token="$(poetry run python scripts/generate_edl_tokens.py ops)"
+          echo "::add-mask::$token"
+          echo "edl_token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Validate OPS EDL token
+        uses: ./.github/actions/check-edl-token
+        with:
+          environment: ops
+          edl-token: ${{ steps.generate.outputs.edl_token }}
+
+      - name: Update OPS secret
+        env:
+          GH_TOKEN: ${{ secrets.L2SS_PY_AUTOTEST_PAT }}
+          TOKEN_VALUE: ${{ steps.generate.outputs.edl_token }}
+        run: |
+          printf '%s' "$TOKEN_VALUE" | gh secret set OPS_URS_TOKEN --repo "$GITHUB_REPOSITORY"

@@ -1,0 +1,49 @@
+name: "Check EDL Token"
+description: "Validates an Earthdata Login bearer token against the CMR collections endpoint."
+inputs:
+  environment:
+    description: "Target environment to validate: uat or ops"
+    required: true
+  edl-token:
+    description: "The EDL bearer token to validate"
+    required: true
+outputs:
+  status-code:
+    description: "HTTP status code returned by the CMR collections endpoint"
+    value: ${{ steps.check.outputs.status-code }}
+runs:
+  using: "composite"
+  steps:
+    - name: Validate token
+      id: check
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        EDL_TOKEN: ${{ inputs.edl-token }}
+      run: |
+        case "$ENVIRONMENT" in
+          uat)
+            CMR_URL="https://cmr.uat.earthdata.nasa.gov/search/collections"
+            ;;
+          ops)
+            CMR_URL="https://cmr.earthdata.nasa.gov/search/collections"
+            ;;
+          *)
+            echo "Error: environment must be 'uat' or 'ops'." >&2
+            exit 1
+            ;;
+        esac
+
+        status_code="$(
+          curl -sS -o /dev/null -I \
+            -w '%{http_code}' \
+            -H "Authorization: Bearer $EDL_TOKEN" \
+            "$CMR_URL"
+        )"
+
+        echo "status-code=$status_code" >> "$GITHUB_OUTPUT"
+
+        if [ "$status_code" -ge 400 ]; then
+          echo "Token check failed for $ENVIRONMENT against $CMR_URL (HTTP $status_code)" >&2
+          exit 1
+        fi
