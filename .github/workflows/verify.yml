@@ -36,16 +36,44 @@ jobs:
         with:
           poetry-version: 2.3.2
 
-      - name: Get Environment and Concept ID
-        id: get-env-ccid
-        run: |
-          echo "test_env=$(python -c "print('${{ github.head_ref }}'.split('/')[1])")" >> $GITHUB_OUTPUT
-          echo "concept_id=$(python -c "print('${{ github.head_ref }}'.split('/')[2])")" >> $GITHUB_OUTPUT
-
       - name: Install Dependencies
         id: install
         run: |
           poetry install
+
+      - name: Get Environment and Concept ID
+        id: get-env-ccid
+        run: |
+          # Uses bash string splitting instead of spinning up Python
+          IFS='/' read -r prefix test_env concept_id <<< "${{ github.head_ref }}"
+          
+          echo "test_env=${test_env:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "concept_id=${concept_id:-unknown}" >> "$GITHUB_OUTPUT"
+
+      - name: Set CMR bearer token dynamically
+        id: set-cmr-token
+        env:
+          # Securely map secrets to environment variables to prevent shell injection
+          UAT_TOKEN: ${{ secrets.UAT_URS_TOKEN }}
+          OPS_TOKEN: ${{ secrets.OPS_URS_TOKEN }}
+          # Grab the output from the first step
+          TARGET_ENV: ${{ steps.get-env-ccid.outputs.test_env }}
+        run: |
+          # Convert to uppercase in case the branch uses lowercase (e.g., 'uat' becomes 'UAT')
+          TARGET_ENV_UPPER="${TARGET_ENV^^}"
+
+          case "$TARGET_ENV_UPPER" in
+            UAT)
+              echo "CMR_BEARER_TOKEN=$UAT_TOKEN" >> "$GITHUB_ENV"
+              ;;
+            OPS)
+              echo "CMR_BEARER_TOKEN=$OPS_TOKEN" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "❌ Unknown environment: $TARGET_ENV" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Execute Tests
         id: run-tests
@@ -56,7 +84,7 @@ jobs:
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
         run: |
-          poetry run pytest verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --token-provider lambda --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
+          poetry run pytest verify_collection.py --concept_id $CONCEPT_ID --env $TEST_ENV --junitxml=$GITHUB_WORKSPACE/test-results/test_report.xml --html=$GITHUB_WORKSPACE/test-results/test_report.html || true
 
       - name: Convert XML to JSON
         id: run-xml-to-json
