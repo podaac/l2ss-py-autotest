@@ -1,0 +1,61 @@
+name: Generate EDL Tokens
+
+on:
+  schedule:
+    # Run daily at 12:00 PM Pacific during daylight saving time (19:00 UTC)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-edl-tokens:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: uat
+            secret_name: UAT_URS_TOKEN
+          - env: ops
+            secret_name: OPS_URS_TOKEN
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: 2.3.2
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Generate EDL token
+        id: generate
+        env:
+          EDL_SERVICE_USERNAME: ${{ secrets.EDL_SERVICE_USERNAME }}
+          EDL_SERVICE_PASSWORD: ${{ secrets.EDL_SERVICE_PASSWORD }}
+        run: |
+          token="$(poetry run python scripts/generate_edl_tokens.py "${{ matrix.env }}")"
+          echo "::add-mask::$token"
+          echo "edl_token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Validate EDL token
+        uses: ./.github/actions/check-edl-token
+        with:
+          environment: ${{ matrix.env }}
+          edl-token: ${{ steps.generate.outputs.edl_token }}
+
+      - name: Update EDL secret
+        env:
+          GH_TOKEN: ${{ secrets.L2SS_PY_AUTOTEST_PAT }}
+          TOKEN_VALUE: ${{ steps.generate.outputs.edl_token }}
+        run: |
+          printf '%s' "$TOKEN_VALUE" | gh secret set "${{ matrix.secret_name }}" --repo "$GITHUB_REPOSITORY"
