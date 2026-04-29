@@ -51,7 +51,7 @@ jobs:
           echo "concept_id=${concept_id:-unknown}" >> "$GITHUB_OUTPUT"
 
       - name: Set CMR bearer token dynamically
-        id: set-cmr-token
+        id: set-edl-token
         env:
           # Securely map secrets to environment variables to prevent shell injection
           UAT_TOKEN: ${{ secrets.UAT_URS_TOKEN }}
@@ -65,15 +65,23 @@ jobs:
           case "$TARGET_ENV_UPPER" in
             UAT)
               echo "CMR_BEARER_TOKEN=$UAT_TOKEN" >> "$GITHUB_ENV"
+              echo "cmr_bearer_token=$UAT_TOKEN" >> "$GITHUB_OUTPUT"
               ;;
             OPS)
               echo "CMR_BEARER_TOKEN=$OPS_TOKEN" >> "$GITHUB_ENV"
+              echo "cmr_bearer_token=$OPS_TOKEN" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "❌ Unknown environment: $TARGET_ENV" >&2
               exit 1
               ;;
           esac
+
+      - name: Validate EDL token
+        uses: ./.github/actions/check-edl-token
+        with:
+          environment: ${{ steps.get-env-ccid.outputs.test_env }}
+          edl-token: ${{ steps.set-edl-token.outputs.cmr_bearer_token }}
 
       - name: Execute Tests
         id: run-tests
