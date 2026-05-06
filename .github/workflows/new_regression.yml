@@ -22,14 +22,14 @@ jobs:
     outputs:
       environment: ${{ steps.prepare.outputs.environment }}
       environment_upper: ${{ steps.prepare.outputs.environment_upper }}
+      harmony_status: ${{ steps.check-harmony.outputs.harmony_status }}
       matrix_chunks: ${{ steps.prepare.outputs.matrix_chunks }}
     steps:
       - uses: actions/checkout@v4
       
-      - name: Determine Environment & Generate Chunks
+      - name: Determine Environment
         id: prepare
         run: |
-          # 1. Determine Environment
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ENV="${{ inputs.environment }}"
           elif [ "${{ github.event.schedule }}" = "0 8 */3 * *" ]; then
@@ -41,12 +41,60 @@ jobs:
           echo "environment=$ENV" >> "$GITHUB_OUTPUT"
           echo "environment_upper=${ENV^^}" >> "$GITHUB_OUTPUT"
 
-          # 2. Chunk Files
+      - name: Check Harmony Health
+        id: check-harmony
+        env:
+          TARGET_ENV: ${{ steps.prepare.outputs.environment }}
+        run: |
+          if [ "$TARGET_ENV" = "uat" ]; then
+            HEALTH_URL="https://harmony.uat.earthdata.nasa.gov/health"
+          else
+            HEALTH_URL="https://harmony.earthdata.nasa.gov/health"
+          fi
+
+          HEALTH_RESPONSE="$(curl -fsS --max-time 20 "$HEALTH_URL" 2>/dev/null || true)"
+          HEALTH_STATUS="$(printf '%s' "$HEALTH_RESPONSE" | jq -r '.status // "down"' 2>/dev/null || echo down)"
+
+          if [ "$HEALTH_STATUS" != "up" ]; then
+            HEALTH_STATUS="down"
+          fi
+
+          echo "Harmony health check for $TARGET_ENV: $HEALTH_STATUS"
+          echo "harmony_status=$HEALTH_STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Set EDL token for validation
+        id: set-edl-token
+        env:
+          TARGET_ENV: ${{ steps.prepare.outputs.environment }}
+        run: |
+          case "$TARGET_ENV" in
+            uat)
+              echo "edl_token=${{ secrets.UAT_URS_TOKEN }}" >> "$GITHUB_OUTPUT"
+              ;;
+            ops)
+              echo "edl_token=${{ secrets.OPS_URS_TOKEN }}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "❌ Unknown environment: $TARGET_ENV" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Validate EDL token
+        uses: ./.github/actions/check-edl-token
+        with:
+          environment: ${{ steps.prepare.outputs.environment }}
+          edl-token: ${{ steps.set-edl-token.outputs.edl_token }}
+
+      - name: Generate Chunks
+        if: ${{ steps.check-harmony.outputs.harmony_status == 'up' }}
+        env:
+          ENV: ${{ steps.prepare.outputs.environment }}
+        run: |
           shopt -s nullglob
           files=(tests/cmr/l2ss-py/${ENV}/*)
           total=${#files[@]}
 
-          # Handle 0 files gracefully
           if [ "$total" -eq 0 ]; then
             echo "No files found for environment $ENV!"
             echo "matrix_chunks=[]" >> "$GITHUB_OUTPUT"
@@ -56,10 +104,8 @@ jobs:
           max_chunk_size=250
           num_chunks=10
 
-          # Compute dynamic chunk size
           chunk_size=$(( (total + num_chunks - 1) / num_chunks ))
 
-          # Enforce the maximum
           if (( chunk_size > max_chunk_size )); then
             chunk_size=$max_chunk_size
             num_chunks=$(( (total + chunk_size - 1) / chunk_size ))
@@ -69,22 +115,18 @@ jobs:
           echo "Chunk size: $chunk_size"
           echo "Chunks: $num_chunks"
 
-          # Generate a single JSON array of all chunks for the Matrix.
-          # Each element has:
-          #   - id:     1-based chunk index (for naming)
-          #   - include: [{env, file}, ...] used by the child workflow matrix.
           chunks_json=$(
             for i in $(seq 0 $((num_chunks - 1))); do
               start=$((i * chunk_size))
               chunk=("${files[@]:start:chunk_size}")
-              
+
               [ ${#chunk[@]} -eq 0 ] && continue
-              
+
               chunk_id=$((i + 1))
               printf '%s\n' "${chunk[@]}" \
                 | jq -R 'split("/") | {env: .[-2], file: .[-1]}' \
                 | jq -s --arg id "$chunk_id" '{id: ($id|tonumber), include: .}'
-            done | jq -s -c '.' # Slurp all objects into one valid JSON array
+            done | jq -s -c '.'
           )
 
           echo "matrix_chunks=$chunks_json" >> "$GITHUB_OUTPUT"
@@ -92,7 +134,7 @@ jobs:
   process-chunks:
     needs: setup-and-chunk
     # Only run if there are actual chunks to process
-    if: ${{ needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
+    if: ${{ needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
     name: process-chunk-${{ matrix.chunk.id }}
     strategy:
       fail-fast: false
@@ -111,7 +153,7 @@ jobs:
   aggregate-failures:
     needs: [setup-and-chunk, process-chunks]
     runs-on: ubuntu-latest
-    if: always()
+    if: ${{ always() && needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

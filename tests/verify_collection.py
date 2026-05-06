@@ -239,7 +239,7 @@ def get_half_temporal_extent(start: str, end: str):
     new_start_dt = start_dt + quarter_duration
     new_end_dt = end_dt - quarter_duration
     
-    return {"start": new_start_dt, "end": new_end_dt, "stop": new_end_dt}
+    return {"start": new_start_dt, "stop": new_end_dt}
 
 
 def get_bounding_box(granule_umm_json):
