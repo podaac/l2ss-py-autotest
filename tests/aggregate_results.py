@@ -153,7 +153,7 @@ def create_or_update_github_issue(repo, token, title, body, labels=None, issue_n
         else:
             print(f"Failed to update issue: {title} (status {response.status_code})\n{response.text}")
     else:
-        create_github_issue(repo, token, title, body, labels=labels , assignees=assignees)
+        create_github_issue(repo, token, title, body, labels=labels, assignees=assignees)
 
 
 def format_message(msg, max_lines=30):
@@ -728,7 +728,7 @@ def process_failed_job_file(
         error_labels = extract_labels_from_message(pretty_reason)
         labels = [label] + error_labels
         labels.append(TEAM_TVA_LABEL)
-        create_or_update_github_issue(repo, token, title, body_md, labels=labels + error_labels)
+        create_or_update_github_issue(repo, token, title, body_md, labels=labels)
 
     return True
 

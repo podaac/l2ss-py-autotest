@@ -6,7 +6,7 @@ from groq import Groq
 import time
 from requests.auth import HTTPBasicAuth
 
-from aggregate_results import TEAM_TVA_LABEL
+TEAM_TVA_LABEL = "team:tva"
 
 
 def bearer_token(env):
@@ -224,14 +224,15 @@ def create_or_update_issue(repo_name, github_token, env, groq_api_key):
         for item in failed:
             message = item.get('message')
             try:
-                error_message = summarize_error(client, message) if client else message
+                if client:
+                    error_message = summarize_error(client, message)
+                    time.sleep(10)
+                else:
+                    error_message = message
                 item['error_message'] = error_message
             except Exception:
                 # fallback to original message if there's an error with the summarization
                 item['error_message'] = message
-
-
-            time.sleep(10)
 
         collection_names = get_collection_names(providers, env, all_collections)
         issue_body = datetime.now().strftime("Updated on %m-%d-%Y\n")
