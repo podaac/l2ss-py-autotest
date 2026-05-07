@@ -17,6 +17,8 @@ def extract_labels(case):
             labels.append("Forbidden")
         if hasattr(result, "message") and "Could not determine time variable" in str(result.message):
             labels.append("No Time Var")
+        if hasattr(result, "message") and "Unable to find latitude and longitude variables" in str(result.message):
+            labels.append("No Lat/Lon")
 
     return labels
 
