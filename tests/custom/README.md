@@ -36,32 +36,58 @@ By default:
 - If a collection-level custom test exists, generic spatial/temporal tests are skipped.
 - Provider-level custom tests run alongside generic tests unless you explicitly replace them.
 
-## Override Flags
-These are the most common flags you can use in `tests/overrides.json` or a custom overrides file.
+That means:
+- For a collection-level custom test, you usually do not need anything in `overrides.json` just to skip the generic tests.
+- For a provider-level custom test, add an override only if you want to suppress the generic tests too.
 
-- `run_generic`: master switch for generic tests for that collection, provider, or group. `false` disables both spatial and temporal generic tests.
-- `disable_generic`: stronger master switch. If `true`, generic tests are skipped even if other flags would allow them.
-- `run_generic_spatial`: controls only the generic spatial test. `false` skips spatial, but temporal may still run.
-- `run_generic_temporal`: controls only the generic temporal test. `false` skips temporal, but spatial may still run.
-- `skip_spatial`: explicit opt-out for spatial testing.
-- `skip_temporal`: explicit opt-out for temporal testing.
-- `force_spatial`: lets a collection run spatial tests even if it appears in the spatial skip list.
-- `force_temporal`: lets a collection run temporal tests even if it appears in the temporal skip list.
-- `also_run_generic`: when custom collection or group tests exist, keep the generic tests too.
-- `replace_generic`: when custom provider tests exist, skip the generic tests.
-- `spatial_bbox_scale`: shrinks the spatial box relative to the chosen extent. Use `1.0` to keep the bbox exactly as provided.
+## Common Overrides
+These are the main overrides for the default spatial and temporal tests.
+
+- `generic_mode`: controls the generic spatial and temporal tests together. Use `all`, `spatial`, `temporal`, or `none`.
 - `spatial_bbox`: overrides the spatial area used to choose the granule and build the spatial Harmony request.
 - `granule_concept_id`: forces the test to use a specific granule instead of selecting one from CMR.
+
+## Advanced Tuning
+These options are still supported, but most users should not need them.
+
+- `spatial_bbox_scale`: shrinks the spatial box relative to the chosen extent. Use `1.0` to keep the bbox exactly as provided.
 - `temporal_fraction`: shrinks the temporal request to the middle portion of the granule time range.
 - `members`: the list of collection concept IDs that belong to a collection group.
 
-To replace generic tests for a provider, add to your overrides file:
+## Special-Case Overrides
+Some collection or provider cases still need policy overrides beyond the default spatial and temporal tuning. Those are supported in the overrides file, but the normal path is to use `generic_mode`, `spatial_bbox`, and `granule_concept_id`.
+
+To keep both generic spatial and temporal tests enabled for a collection, add:
 
 ```
 {
-  "providers": {
-    "GES_DISC": {
-      "replace_generic": true
+  "collections": {
+    "C1234567890-GES_DISC": {
+      "generic_mode": "all"
+    }
+  }
+}
+```
+
+To run only the generic spatial test for a collection, add:
+
+```
+{
+  "collections": {
+    "C1234567890-GES_DISC": {
+      "generic_mode": "spatial"
+    }
+  }
+}
+```
+
+To disable the generic tests for a collection, add:
+
+```
+{
+  "collections": {
+    "C1234567890-GES_DISC": {
+      "generic_mode": "none"
     }
   }
 }
@@ -78,6 +104,23 @@ To run both custom and generic for a collection, add:
   }
 }
 ```
+
+You can use the same pattern for a provider override:
+
+```
+{
+  "providers": {
+    "GES_DISC": {
+      "generic_mode": "none"
+    }
+  }
+}
+```
+
+That disables the generic spatial and temporal tests for every collection under that provider.
+
+`also_run_generic` is only used for collection or group custom tests, where generic tests are skipped by default.
+For provider overrides, use `generic_mode` or `replace_generic` instead.
 
 To force the spatial test to use a specific bbox for a collection, add `spatial_bbox`
 to that collection's override block:
@@ -151,26 +194,14 @@ You can separate groups by environment:
 }
 ```
 
-## Disable generic tests
+## Disable Generic Tests
 If you want to run only custom tests and skip generic ones:
 
 ```
 {
   "collections": {
     "C1234567890-GES_DISC": {
-      "run_generic": false
-    }
-  }
-}
-```
-
-You can also disable only one generic test type:
-
-```
-{
-  "collections": {
-    "C1234567890-GES_DISC": {
-      "run_generic_spatial": false
+      "generic_mode": "none"
     }
   }
 }

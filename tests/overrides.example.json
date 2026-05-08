@@ -8,7 +8,7 @@
   "collections": {
     "C1234567890-GES_DISC": {
       "skip_spatial": true,
-      "run_generic": false
+      "generic_mode": "none"
     },
     "C9876543210-GES_DISC": {
       "force_temporal": true,
@@ -24,7 +24,7 @@
         "C1111111111-GES_DISC"
       ],
       "skip_temporal": true,
-      "run_generic_temporal": false,
+      "generic_mode": "spatial",
       "spatial_bbox_scale": 0.9,
       "spatial_bbox": {
         "west": -15,

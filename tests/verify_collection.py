@@ -398,25 +398,45 @@ def test_custom_collection_or_provider(collection_concept_id, env, request):
     _run_custom_tests_for_collection(collection_concept_id, env, request)
 
 
+def _normalize_generic_mode(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return "all" if value else "none"
+
+    mode = str(value).strip().lower()
+    aliases = {
+        "true": "all",
+        "false": "none",
+        "on": "all",
+        "off": "none",
+        "both": "all",
+        "all": "all",
+        "none": "none",
+        "spatial": "spatial",
+        "temporal": "temporal",
+        "auto": None,
+    }
+    if mode not in aliases:
+        raise ValueError("generic_mode must be one of: all, spatial, temporal, none, auto")
+    return aliases[mode]
+
+
 def should_run_generic(test_kind: str, overrides: dict) -> bool:
     """
     Determine whether to run generic tests.
-    Supported override keys (bool):
-      - run_generic (default True)
-      - run_generic_spatial / run_generic_temporal
-      - disable_generic (default False)
+    Supported override keys:
+      - generic_mode (all, spatial, temporal, none)
     """
-    if overrides.get("disable_generic") is True:
+    generic_mode = _normalize_generic_mode(overrides.get("generic_mode"))
+    if generic_mode == "none":
         return False
-    if overrides.get("run_generic") is False:
-        return False
-
-    if test_kind == "spatial":
-        if overrides.get("run_generic_spatial") is False:
-            return False
-    if test_kind == "temporal":
-        if overrides.get("run_generic_temporal") is False:
-            return False
+    if generic_mode == "all":
+        return True
+    if generic_mode == "spatial":
+        return test_kind == "spatial"
+    if generic_mode == "temporal":
+        return test_kind == "temporal"
     return True
 
 # Fixture for the first skip list (skip_collections1.csv)
@@ -588,15 +608,18 @@ def get_middle_temporal_extent(start: str, end: str, fraction: float = DEFAULT_T
         raise ValueError(f"temporal_fraction must be within (0, 1], got {fraction}")
 
     total_duration = end_dt - start_dt
-    if total_duration.total_seconds() <= 0:
-        raise ValueError("Invalid temporal range: end time must be after start time")
-
-    keep_duration = total_duration * fraction
-    trim = (total_duration - keep_duration) / 2
-    new_start_dt = start_dt + trim
-    new_end_dt = end_dt - trim
-
-    return {"start": new_start_dt, "end": new_end_dt, "stop": new_end_dt}
+    
+    # Calculate the half duration
+    half_duration = total_duration / 2
+    
+    # Calculate the quarter duration (half of the half duration)
+    quarter_duration = half_duration / 2
+    
+    # Determine the new start and end times
+    new_start_dt = start_dt + quarter_duration
+    new_end_dt = end_dt - quarter_duration
+    
+    return {"start": new_start_dt, "stop": new_end_dt}
 
 
 def get_bounding_box(granule_umm_json):
