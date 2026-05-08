@@ -302,7 +302,7 @@ def _matching_group_dirs(collection_concept_id: str, env: str) -> list:
     return matches
 
 
-def _first_existing_path(candidates: list) -> pathlib.Path:
+def _first_existing_path(candidates: list) -> Optional[pathlib.Path]:
     for path in candidates:
         if path.exists():
             return path
@@ -314,7 +314,7 @@ def find_custom_tests(collection_concept_id: str, env: str) -> dict:
     provider_file = _provider_custom_file(provider) if provider else None
     collection_file = _first_existing_path(_collection_custom_file_candidates(collection_concept_id, env))
     has_provider = bool(provider_file and provider_file.exists())
-    has_collection = collection_file.exists() or _collection_custom_dir_has_tests(collection_concept_id, env)
+    has_collection = bool(collection_file and collection_file.exists()) or _collection_custom_dir_has_tests(collection_concept_id, env)
     group_dirs = _matching_group_dirs(collection_concept_id, env)
     has_group = bool(group_dirs)
     return {
