@@ -23,7 +23,8 @@ jobs:
       environment: ${{ steps.prepare.outputs.environment }}
       environment_upper: ${{ steps.prepare.outputs.environment_upper }}
       harmony_status: ${{ steps.check-harmony.outputs.harmony_status }}
-      matrix_chunks: ${{ steps.prepare.outputs.matrix_chunks }}
+      edl_status: ${{ steps.record-edl-status.outputs.edl_status }}
+      matrix_chunks: ${{ steps.generate_chunks.outputs.matrix_chunks }}
     steps:
       - uses: actions/checkout@v4
       
@@ -81,13 +82,26 @@ jobs:
           esac
 
       - name: Validate EDL token
+        id: validate-edl-token
+        continue-on-error: true
         uses: ./.github/actions/check-edl-token
         with:
           environment: ${{ steps.prepare.outputs.environment }}
           edl-token: ${{ steps.set-edl-token.outputs.edl_token }}
 
+      - name: Record EDL validation status
+        id: record-edl-status
+        if: always()
+        run: |
+          if [ "${{ steps.validate-edl-token.outcome }}" = "success" ]; then
+            echo "edl_status=up" >> "$GITHUB_OUTPUT"
+          else
+            echo "edl_status=down" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate Chunks
         if: ${{ steps.check-harmony.outputs.harmony_status == 'up' }}
+        id: generate_chunks
         env:
           ENV: ${{ steps.prepare.outputs.environment }}
         run: |
@@ -134,7 +148,7 @@ jobs:
   process-chunks:
     needs: setup-and-chunk
     # Only run if there are actual chunks to process
-    if: ${{ needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
+    if: ${{ needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.edl_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
     name: process-chunk-${{ matrix.chunk.id }}
     strategy:
       fail-fast: false
@@ -153,7 +167,7 @@ jobs:
   aggregate-failures:
     needs: [setup-and-chunk, process-chunks]
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
+    if: ${{ always() && needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.edl_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -210,3 +224,41 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           poetry run python tests/aggregate_results.py
+
+  update-alert-issue:
+    needs: setup-and-chunk
+    runs-on: ubuntu-latest
+    if: ${{ always() && (needs.setup-and-chunk.outputs.harmony_status != 'up' || needs.setup-and-chunk.outputs.edl_status != 'up') }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: 2.3.2
+
+      - name: Poetry Install
+        run: poetry install
+
+      - name: Update alert issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          args=(--env "${{ needs.setup-and-chunk.outputs.environment }}")
+
+          if [ "${{ needs.setup-and-chunk.outputs.harmony_status }}" != "up" ]; then
+            args+=(--alert "Harmony was unavailable, so regression aggregation was skipped for this run.")
+          fi
+
+          if [ "${{ needs.setup-and-chunk.outputs.edl_status }}" != "up" ]; then
+            args+=(--alert "EDL token validation failed, so regression jobs could not use Earthdata access.")
+          fi
+
+          poetry run python scripts/update_issue_alert.py "${args[@]}"
