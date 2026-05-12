@@ -10,11 +10,13 @@ import cf_xarray as cfxr
 import harmony
 import netCDF4
 import numpy as np
-import podaac.subsetter.subset
+import podaac.subsetter.utils as podaac_utils
 import pytest
 import requests
 import xarray
 import csv
+
+open_datatree = getattr(xarray, "open_datatree", None)
 
 import cmr
 import token_utils
@@ -756,8 +758,6 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
         filename = f'my_copy_file_{collection_concept_id}.nc'
         shutil.copy(file_to_subset, filename)
         nc_dataset = netCDF4.Dataset(filename, mode='r+')
-        # flatten the dataset
-        nc_dataset_flattened = podaac.subsetter.group_handling.transform_grouped_dataset(nc_dataset, filename)
 
         args = {
                 'decode_coords': False,
@@ -770,7 +770,7 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
             **args
             ) as flat_dataset:
                 # use l2ss-py to find lat and lon names
-                lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(flat_dataset)
+                lat_var_names, lon_var_names, _ = podaac_utils.get_coordinate_variable_names(flat_dataset)
 
         os.remove(filename)
         if lat_var_names and lon_var_names:
@@ -804,57 +804,47 @@ def find_variable(ds, var_name):
         var_ds = ds.get(var_name.rsplit("/", 1)[-1], None)
     return var_ds
 
-def walk_netcdf_groups(subsetted_filepath, lat_var_name):
+def iter_datatree_nodes(tree, current_path=""):
+    yield current_path, tree
+    for child_name, child_tree in tree.children.items():
+        child_path = f"{current_path}/{child_name}" if current_path else child_name
+        yield from iter_datatree_nodes(child_tree, child_path)
 
-    with netCDF4.Dataset(subsetted_filepath) as f:
-        group_list = []
-        subsetted_ds_new = None
-        
-        def group_walk(groups, nc_d, current_group):
-            nonlocal subsetted_ds_new
-            
-            # Check if the top group has lat or lon variable
-            if lat_var_name in nc_d.variables:
-                subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=current_group, decode_times=False)
-                return True  # Found latitude variable
-            
-            # Loop through the groups in the current layer
-            for g in groups:
-                # End the loop if we've already found latitude
-                if subsetted_ds_new:
-                    break
-                
-                # Check if the current group has latitude variable
-                if lat_var_name in nc_d.groups[g].variables:
-                    lat_group = '/'.join(group_list + [g])
-                    try:
-                        subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=lat_group, decode_times=False)
-                        
-                        # Add a science variable to the dataset if other groups are present
-                        if nc_d.groups[g].groups:
-                            data_group = next((v for v in nc_d.groups[g].groups if 'time' not in v.lower()), None)
-                            if data_group:
-                                g_data = f"{lat_group}/{data_group}"
-                                subsetted_ds_data = xarray.open_dataset(subsetted_filepath, group=g_data, decode_times=False)
-                                sci_var = list(subsetted_ds_data.variables.keys())[0]
-                                subsetted_ds_new['science_test'] = subsetted_ds_data[sci_var]
-                    except Exception as ex:
-                        print(f"Error while processing group {g}: {ex}")
-                        continue
-                    
-                    break  # Exit the loop once we found the latitude group
 
-                # Recursively call the function on the nested groups
-                if nc_d.groups[g].groups:
-                    group_list.append(g)
-                    found = group_walk(nc_d.groups[g].groups, nc_d.groups[g], g)
-                    group_list.pop()  # Clean up after recursion
-                    if found:
-                        break
+def find_datatree_variable(tree, var_name):
+    for _, node in iter_datatree_nodes(tree):
+        ds = getattr(node, "ds", None)
+        if ds is None:
+            continue
+        var_ds = find_variable(ds, var_name)
+        if var_ds is not None:
+            return var_ds
+    return None
 
-        group_walk(f.groups, f, '')
-        
-    return subsetted_ds_new
+
+def iter_datatree_variable_names(tree):
+    seen = set()
+    for _, node in iter_datatree_nodes(tree):
+        ds = getattr(node, "ds", None)
+        if ds is None:
+            continue
+        for var_name in ds.variables:
+            if var_name not in seen:
+                seen.add(var_name)
+                yield var_name
+
+
+def walk_datatree_groups(subsetted_filepath, lat_var_name):
+    if open_datatree is None:
+        pytest.fail("DataTree support is required to inspect nested subset outputs.")
+
+    subsetted_tree = open_datatree(subsetted_filepath, decode_times=False)
+    for _, node in iter_datatree_nodes(subsetted_tree):
+        ds = getattr(node, "ds", None)
+        if ds is not None and lat_var_name in ds.variables:
+            return ds, subsetted_tree
+
+    pytest.fail(f"Unable to find latitude variable '{lat_var_name}' in any DataTree node.")
 
 @pytest.mark.timeout(1200)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
@@ -923,7 +913,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     lat_var_name = lat_var_name.split('/')[-1]
     lon_var_name = lon_var_name.split('/')[-1]
 
-    subsetted_ds_new = walk_netcdf_groups(subsetted_filepath, lat_var_name)
+    subsetted_ds_new, subsetted_tree = walk_datatree_groups(subsetted_filepath, lat_var_name)
 
     assert lat_var_name and lon_var_name
 
@@ -935,6 +925,8 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         for var in science_vars:
             science_var_name = var['umm']['Name']
             var_ds = find_variable(subsetted_ds_new, science_var_name)
+            if var_ds is None:
+                var_ds = find_datatree_variable(subsetted_tree, science_var_name)
             if var_ds is not None:
                 try:
                     msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
@@ -944,12 +936,14 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         else:
             var_ds, msk = None, None
     else:
-        for science_var_name in subsetted_ds_new.variables:
+        for science_var_name in iter_datatree_variable_names(subsetted_tree):
             if (str(science_var_name) not in lat_var_name and 
                 str(science_var_name) not in lon_var_name and 
                 'time' not in str(science_var_name)):
 
                 var_ds = find_variable(subsetted_ds_new, science_var_name)
+                if var_ds is None:
+                    var_ds = find_datatree_variable(subsetted_tree, science_var_name)
                 if var_ds is not None:
                     try:
                         msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
