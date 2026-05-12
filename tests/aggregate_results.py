@@ -19,6 +19,14 @@ DAAC_ASSIGNEES = config.get('assignees', {})
 
 TEAM_TVA_LABEL = "team:tva"
 
+
+def get_assignee_from_concept_id(concept_id):
+    for key, value in DAAC_ASSIGNEES.items():
+        if key in concept_id:
+            return value
+    return None
+
+
 def bearer_token(env, token_provider="direct"):
     try:
         return fetch_bearer_token_by_provider(env, token_provider)
@@ -613,11 +621,7 @@ def process_one_failure(
         issue_labels = [label] + error_labels
         issue_labels.append(TEAM_TVA_LABEL)
 
-        assignee = None
-        for key, value in DAAC_ASSIGNEES.items():
-            if key in concept_id:
-                assignee = value
-                break
+        assignee = get_assignee_from_concept_id(concept_id)
 
         assignees = [assignee] if assignee else None
         if not issue:
@@ -728,7 +732,10 @@ def process_failed_job_file(
         error_labels = extract_labels_from_message(pretty_reason)
         labels = [label] + error_labels
         labels.append(TEAM_TVA_LABEL)
-        create_or_update_github_issue(repo, token, title, body_md, labels=labels)
+        create_or_update_github_issue(
+            repo, token, title, body_md,
+            labels=labels, assignees=get_assignee_from_concept_id(concept_id)
+        )
 
     return True
 
