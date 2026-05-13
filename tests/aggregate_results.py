@@ -732,9 +732,11 @@ def process_failed_job_file(
         error_labels = extract_labels_from_message(pretty_reason)
         labels = [label] + error_labels
         labels.append(TEAM_TVA_LABEL)
+        assignee = get_assignee_from_concept_id(concept_id)
+        assignees = [assignee] if assignee else None
         create_or_update_github_issue(
             repo, token, title, body_md,
-            labels=labels, assignees=get_assignee_from_concept_id(concept_id)
+            labels=labels, assignees=assignees
         )
 
     return True
