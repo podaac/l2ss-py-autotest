@@ -214,17 +214,18 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token_mana
             raise
 
 
+def _parse_datetime(value: str) -> datetime:
+    for fmt in ('%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ'):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return datetime.fromisoformat(value)
+
+
 def get_half_temporal_extent(start: str, end: str):
-    # Adjust the format to handle cases without fractional seconds
-    try:
-        start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%S.%fZ')
-    except ValueError:
-        start_dt = datetime.strptime(start, '%Y-%m-%dT%H:%M:%SZ')
-    
-    try:
-        end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%S.%fZ')
-    except ValueError:
-        end_dt = datetime.strptime(end, '%Y-%m-%dT%H:%M:%SZ')
+    start_dt = _parse_datetime(start)
+    end_dt = _parse_datetime(end)
     
     # Calculate the total duration
     total_duration = end_dt - start_dt
