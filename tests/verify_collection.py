@@ -258,7 +258,6 @@ def get_bounding_box(granule_umm_json):
                 for point in points:
                     longitude_list.append(point.get('Longitude'))
                     latitude_list.append(point.get('Latitude'))
-                break
         elif lines:
             points = lines[0].get('Points')
             for point in points:
