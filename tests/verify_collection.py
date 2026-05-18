@@ -592,10 +592,12 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token_mana
             raise
 
 def _parse_umm_datetime(value: str) -> datetime:
-    try:
-        return datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%fZ')
-    except ValueError:
-        return datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ')
+    for fmt in ('%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ'):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return datetime.fromisoformat(value)
 
 
 def get_middle_temporal_extent(start: str, end: str, fraction: float = DEFAULT_TEMPORAL_FRACTION):
