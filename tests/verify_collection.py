@@ -593,7 +593,6 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token_mana
                 continue
             raise
 
-
 def _parse_umm_datetime(value: str) -> datetime:
     try:
         return datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%fZ')
@@ -639,7 +638,6 @@ def get_bounding_box(granule_umm_json):
                 for point in points:
                     longitude_list.append(point.get('Longitude'))
                     latitude_list.append(point.get('Latitude'))
-                break
         elif lines:
             points = lines[0].get('Points')
             for point in points:
