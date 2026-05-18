@@ -8,9 +8,8 @@ from datetime import datetime, timedelta
 
 import cf_xarray as cfxr
 import harmony
-import netCDF4
 import numpy as np
-import podaac.subsetter.utils as podaac_utils
+from podaac.subsetter.utils import coordinate_utils
 import pytest
 import requests
 import xarray
@@ -25,7 +24,6 @@ VALID_LATITUDE_VARIABLE_NAMES = ['lat', 'latitude']
 VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
 
 assert cfxr, "cf_xarray adds extensions to xarray on import"
-GROUP_DELIM = '__'
 DEFAULT_SPATIAL_BBOX_SCALE = 0.95
 DEFAULT_TEMPORAL_FRACTION = 0.5
 CUSTOM_TESTS_DIRNAME = "custom"
@@ -752,32 +750,23 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
 
     # If that still doesn't work, try using l2ss-py directly
     try:
-        # file not able to be flattened unless locally downloaded
         filename = f'my_copy_file_{collection_concept_id}.nc'
         shutil.copy(file_to_subset, filename)
-        nc_dataset = netCDF4.Dataset(filename, mode='r+')
+        flat_tree = open_datatree(filename, decode_times=False)
 
-        args = {
-                'decode_coords': False,
-                'mask_and_scale': False,
-                'decode_times': False
-                }
-        
-        with xarray.open_dataset(
-            xarray.backends.NetCDF4DataStore(nc_dataset_flattened),
-            **args
-            ) as flat_dataset:
-                # use l2ss-py to find lat and lon names
-                lat_var_names, lon_var_names, _ = podaac_utils.get_coordinate_variable_names(flat_dataset)
+        # use l2ss-py to find lat and lon names
+        lat_var_names, lon_var_names, _ = coordinate_utils.get_coordinate_variable_names(flat_tree)
 
-        os.remove(filename)
         if lat_var_names and lon_var_names:
-            lat_var_name = lat_var_names.split('__')[-1] if isinstance(lat_var_names, str) else lat_var_names[0].split('__')[-1]
-            lon_var_name = lon_var_names.split('__')[-1] if isinstance(lon_var_names, str) else lon_var_names[0].split('__')[-1]
+            lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
+            lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
             return lat_var_name, lon_var_name
         
     except ValueError:
         logging.warning("Unable to find lat/lon vars using l2ss-py")
+    finally:
+        if os.path.exists(filename):
+            os.remove(filename)
 
     # Still no dice, try using the 'units' variable attribute
     for coord_name, coord in dataset.coords.items():
