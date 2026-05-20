@@ -12,13 +12,14 @@ import numpy as np
 from podaac.subsetter.utils import coordinate_utils
 import pytest
 import requests
-import xarray
+import xarray as xr
 import csv
-
-open_datatree = getattr(xarray, "open_datatree", None)
 
 import cmr
 import token_utils
+
+import importlib.util
+import inspect
 
 VALID_LATITUDE_VARIABLE_NAMES = ['lat', 'latitude']
 VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
@@ -104,6 +105,33 @@ def read_overrides_file(path: str) -> dict:
         return json.load(f)
 
 
+def validate_overrides_config(overrides: dict, overrides_file: str) -> None:
+    if not overrides:
+        return
+
+    groups = overrides.get("collection_groups", {}) or {}
+    member_to_groups = {}
+
+    for group_name, group in groups.items():
+        if not isinstance(group, dict):
+            pytest.fail(f"Invalid collection_groups entry '{group_name}' in {overrides_file}: expected an object.")
+
+        members = group.get("members", [])
+        if not isinstance(members, list):
+            pytest.fail(f"Invalid collection_groups entry '{group_name}' in {overrides_file}: 'members' must be a list.")
+
+        for member in members:
+            member_to_groups.setdefault(member, []).append(group_name)
+
+    conflicts = {member: group_names for member, group_names in member_to_groups.items() if len(group_names) > 1}
+    if conflicts:
+        details = ", ".join(f"{member} -> {', '.join(group_names)}" for member, group_names in sorted(conflicts.items()))
+        pytest.fail(
+            f"Invalid overrides config in {overrides_file}: some collections appear in multiple collection_groups: {details}. "
+            "A collection may belong to only one collection_groups entry."
+        )
+
+
 def parse_spatial_bbox(value) -> Optional[Tuple[float, float, float, float]]:
     if value is None or value == "":
         return None
@@ -142,7 +170,7 @@ def resolve_overrides(overrides: dict, collection_concept_id: str) -> dict:
     provider_overrides = {}
     providers = overrides.get("providers", {})
     if provider:
-        provider_overrides = providers.get(provider, {}) or providers.get(provider.lower(), {}) or providers.get(provider.upper(), {}) or {}
+        provider_overrides = providers.get(provider, {})
 
     collection_overrides = {}
     collections = overrides.get("collections", {})
@@ -166,7 +194,7 @@ def resolve_overrides(overrides: dict, collection_concept_id: str) -> dict:
     return {**provider_overrides, **group_overrides, **collection_overrides}
 
 
-def resolve_spatial_bbox(pytestconfig, collection_overrides: dict) -> Optional[Tuple[float, float, float, float]]:
+def resolve_spatial_bbox(pytestconfig, collection_overrides: dict) -> Tuple[float, float, float, float] | None:
     configured = pytestconfig.getoption("bbox")
     if configured:
         return parse_spatial_bbox(configured)
@@ -329,8 +357,6 @@ def find_custom_tests(collection_concept_id: str, env: str) -> dict:
 def _load_custom_test_functions(path: pathlib.Path):
     if not path or not path.exists():
         return []
-    import importlib.util
-    import inspect
 
     module_name = f"custom_{abs(hash(str(path)))}"
     spec = importlib.util.spec_from_file_location(module_name, path)
@@ -367,7 +393,6 @@ def _load_group_test_functions(collection_concept_id: str, env: str):
 
 
 def _run_custom_tests_for_collection(collection_concept_id: str, env: str, request):
-    import inspect
     provider = parse_provider_from_concept_id(collection_concept_id)
     provider_file = _provider_custom_file(provider) if provider else None
     collection_file = _first_existing_path(_collection_custom_file_candidates(collection_concept_id, env))
@@ -466,7 +491,9 @@ def overrides_file(pytestconfig):
 @pytest.fixture(scope="session")
 def overrides(overrides_file):
     try:
-        return read_overrides_file(overrides_file)
+        data = read_overrides_file(overrides_file)
+        validate_overrides_config(data, overrides_file)
+        return data
     except Exception as exc:
         pytest.fail(f"Unable to read overrides file at {overrides_file}: {exc}")
 
@@ -729,7 +756,8 @@ def create_smaller_bounding_box(east, west, north, south, scale_factor):
     return smaller_east, smaller_west, smaller_north, smaller_south
 
 
-def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collection_variable_list: List[Dict], collection_concept_id: str):
+def get_lat_lon_var_names(tree: xr.DataTree, file_to_subset: str, collection_variable_list: List[Dict], collection_concept_id: str):
+    dataset = tree.ds
     # Try getting it from UMM-Var first
     lat_var_json, lon_var_json, _ = get_coordinate_vars_from_umm(collection_variable_list)
     lat_var_name = get_variable_name_from_umm_json(lat_var_json)
@@ -754,10 +782,10 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
     try:
         filename = f'my_copy_file_{collection_concept_id}.nc'
         shutil.copy(file_to_subset, filename)
-        flat_tree = open_datatree(filename, decode_times=False)
+        data_tree = xr.open_datatree(filename, decode_times=False)
 
         # use l2ss-py to find lat and lon names
-        lat_var_names, lon_var_names, _ = coordinate_utils.get_coordinate_variable_names(flat_tree)
+        lat_var_names, lon_var_names, _ = coordinate_utils.get_coordinate_variable_names(data_tree)
 
         if lat_var_names and lon_var_names:
             lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
@@ -785,55 +813,6 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
 
     # Out of options, fail the test because we couldn't determine lat/lon variables
     pytest.fail(f"Unable to find latitude and longitude variables.")
-
-def find_variable(ds, var_name):
-    try:
-        var_ds = ds[var_name]
-    except KeyError:
-        var_ds = ds.get(var_name.rsplit("/", 1)[-1], None)
-    return var_ds
-
-def iter_datatree_nodes(tree, current_path=""):
-    yield current_path, tree
-    for child_name, child_tree in tree.children.items():
-        child_path = f"{current_path}/{child_name}" if current_path else child_name
-        yield from iter_datatree_nodes(child_tree, child_path)
-
-
-def find_datatree_variable(tree, var_name):
-    for _, node in iter_datatree_nodes(tree):
-        ds = getattr(node, "ds", None)
-        if ds is None:
-            continue
-        var_ds = find_variable(ds, var_name)
-        if var_ds is not None:
-            return var_ds
-    return None
-
-
-def iter_datatree_variable_names(tree):
-    seen = set()
-    for _, node in iter_datatree_nodes(tree):
-        ds = getattr(node, "ds", None)
-        if ds is None:
-            continue
-        for var_name in ds.variables:
-            if var_name not in seen:
-                seen.add(var_name)
-                yield var_name
-
-
-def walk_datatree_groups(subsetted_filepath, lat_var_name):
-    if open_datatree is None:
-        pytest.fail("DataTree support is required to inspect nested subset outputs.")
-
-    subsetted_tree = open_datatree(subsetted_filepath, decode_times=False)
-    for _, node in iter_datatree_nodes(subsetted_tree):
-        ds = getattr(node, "ds", None)
-        if ds is not None and lat_var_name in ds.variables:
-            return ds, subsetted_tree
-
-    pytest.fail(f"Unable to find latitude variable '{lat_var_name}' in any DataTree node.")
 
 @pytest.mark.timeout(1200)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
@@ -895,14 +874,9 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             raise
 
     # Verify spatial subset worked
-    subsetted_ds = xarray.open_dataset(subsetted_filepath, decode_times=False)
+    subsetted_tree = xr.open_datatree(subsetted_filepath, decode_times=False)
     group = None
-    # Try to read group in file
-    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables, collection_concept_id)
-    lat_var_name = lat_var_name.split('/')[-1]
-    lon_var_name = lon_var_name.split('/')[-1]
-
-    subsetted_ds_new, subsetted_tree = walk_datatree_groups(subsetted_filepath, lat_var_name)
+    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_tree, subsetted_filepath, collection_variables, collection_concept_id)
 
     assert lat_var_name and lon_var_name
 
@@ -913,47 +887,45 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     if science_vars:
         for var in science_vars:
             science_var_name = var['umm']['Name']
-            var_ds = find_variable(subsetted_ds_new, science_var_name)
-            if var_ds is None:
-                var_ds = find_datatree_variable(subsetted_tree, science_var_name)
-            if var_ds is not None:
+            candidate = subsetted_tree.get(science_var_name)
+            if isinstance(candidate, xr.DataArray):
+                var_ds = candidate
                 try:
-                    msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
+                    msk = np.logical_not(np.isnan(candidate.data.squeeze()))
                     break
                 except Exception:
                     continue
         else:
             var_ds, msk = None, None
     else:
-        for science_var_name in iter_datatree_variable_names(subsetted_tree):
-            if (str(science_var_name) not in lat_var_name and 
-                str(science_var_name) not in lon_var_name and 
-                'time' not in str(science_var_name)):
-
-                var_ds = find_variable(subsetted_ds_new, science_var_name)
-                if var_ds is None:
-                    var_ds = find_datatree_variable(subsetted_tree, science_var_name)
-                if var_ds is not None:
-                    try:
-                        msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-                        break
-                    except Exception:
-                        continue
-        else:
-            var_ds, msk = None, None
+        var_ds, msk = None, None
+        for node in subsetted_tree.subtree:
+            if node.is_empty:
+                continue
+            for science_var_name, var_candidate in node.data_vars.items():
+                if any(x in str(science_var_name) for x in (lat_var_name, lon_var_name, "time")):
+                    continue
+                try:
+                    msk = np.logical_not(np.isnan(var_candidate.data.squeeze()))
+                    var_ds = var_candidate
+                    break
+                except Exception:
+                    continue
+            if var_ds is not None:
+                break
 
     if var_ds is None or msk is None:
         logging.warning("Unable to find a science variable to use. Proceeding to test longitude and latitude only.")
-        llat = subsetted_ds_new[lat_var_name]
-        llon = subsetted_ds_new[lon_var_name]
+        llat = subsetted_tree[lat_var_name]
+        llon = subsetted_tree[lon_var_name]
     else:
         try:
             msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-            llat = subsetted_ds_new[lat_var_name].where(msk)
-            llon = subsetted_ds_new[lon_var_name].where(msk)
+            llat = subsetted_tree[lat_var_name].where(msk)
+            llon = subsetted_tree[lon_var_name].where(msk)
         except ValueError:
-            llat = subsetted_ds_new[lat_var_name]
-            llon = subsetted_ds_new[lon_var_name]
+            llat = subsetted_tree[lat_var_name]
+            llon = subsetted_tree[lon_var_name]
 
     lat_max = llat.max()
     lat_min = llat.min()
@@ -964,8 +936,8 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     lon_min = (lon_min + 180) % 360 - 180
     lon_max = (lon_max + 180) % 360 - 180
 
-    lat_var_fill_value = subsetted_ds_new[lat_var_name].encoding.get('_FillValue')
-    lon_var_fill_value = subsetted_ds_new[lon_var_name].encoding.get('_FillValue')
+    lat_var_fill_value = subsetted_tree[lat_var_name].encoding.get('_FillValue')
+    lon_var_fill_value = subsetted_tree[lon_var_name].encoding.get('_FillValue')
 
     partial_pass = False
     if lat_var_fill_value:
@@ -996,7 +968,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
 @pytest.mark.timeout(1200)
 def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_temporal, overrides):
-    test_spatial_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
+    test_temporal_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
 
     collection_overrides = resolve_overrides(overrides, collection_concept_id)
     if not should_run_generic("temporal", collection_overrides):

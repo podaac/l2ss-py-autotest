@@ -54,10 +54,10 @@ These options are still supported, but most users should not need them.
 - `temporal_fraction`: shrinks the temporal request to the middle portion of the granule time range.
 - `members`: the list of collection concept IDs that belong to a collection group.
 
-## Special-Case Overrides
+## Special-Case Overrides in `overrides.json`
 Some collection or provider cases still need policy overrides beyond the default spatial and temporal tuning. Those are supported in the overrides file, but the normal path is to use `generic_mode`, `spatial_bbox`, and `granule_concept_id`.
 
-To keep both generic spatial and temporal tests enabled for a collection, add:
+In `overrides.json`, add this block to keep both generic spatial and temporal tests enabled for a collection:
 
 ```
 {
@@ -69,7 +69,7 @@ To keep both generic spatial and temporal tests enabled for a collection, add:
 }
 ```
 
-To run only the generic spatial test for a collection, add:
+In `overrides.json`, add this block to run only the generic spatial test for a collection:
 
 ```
 {
@@ -81,7 +81,7 @@ To run only the generic spatial test for a collection, add:
 }
 ```
 
-To disable the generic tests for a collection, add:
+In `overrides.json`, add this block to disable the generic tests for a collection:
 
 ```
 {
@@ -93,7 +93,7 @@ To disable the generic tests for a collection, add:
 }
 ```
 
-To run both custom and generic for a collection, add:
+In `overrides.json`, add this block to run both custom and generic tests for a collection:
 
 ```
 {
@@ -105,7 +105,7 @@ To run both custom and generic for a collection, add:
 }
 ```
 
-You can use the same pattern for a provider override:
+In `overrides.json`, use the same pattern for a provider override:
 
 ```
 {
@@ -122,8 +122,7 @@ That disables the generic spatial and temporal tests for every collection under 
 `also_run_generic` is only used for collection or group custom tests, where generic tests are skipped by default.
 For provider overrides, use `generic_mode` or `replace_generic` instead.
 
-To force the spatial test to use a specific bbox for a collection, add `spatial_bbox`
-to that collection's override block:
+In `overrides.json`, add `spatial_bbox` to a collection's override block to force the spatial test to use a specific bbox:
 
 ```
 {
@@ -135,7 +134,7 @@ to that collection's override block:
 }
 ```
 
-You can also do the same for a provider or a collection group. For example:
+You can also do the same for a provider or a collection group in `overrides.json`. For example:
 
 ```
 {
@@ -151,7 +150,7 @@ You can also pass a bbox on the command line with `--bbox west,south,east,north`
 The test still applies `spatial_bbox_scale` when shrinking the requested area, so
 set that to `1.0` if you want to use the exact bbox you provided.
 
-To force the test to use a specific granule instead of letting CMR pick one, add:
+In `overrides.json`, add `granule_concept_id` to force the test to use a specific granule instead of letting CMR pick one:
 
 ```
 {
@@ -170,8 +169,6 @@ latest granule for the collection" lookup.
 ## Grouping collections (list override)
 You can apply one override block to multiple collections:
 
-```
-
 ### Environment-specific groups
 You can separate groups by environment:
 
@@ -180,6 +177,10 @@ You can separate groups by environment:
 
 `tests/custom/groups/ops/<GROUP_NAME>/concept_ids.json`
 `tests/custom/groups/ops/<GROUP_NAME>/test_*.py`
+
+In `overrides.json`, add a `collection_groups` block like this:
+
+```
 {
   "collection_groups": {
     "GES_DISC_SPECIAL": {
