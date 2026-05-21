@@ -18,20 +18,8 @@ on:
 
 env:
   # Edit this list for ad hoc testing. Leave blank to run the full set.
-  #TEST_CONCEPT_IDS: ''
-  TEST_CONCEPT_IDS: |
-    C1240560263-GES_DISC
-    C1240560262-GES_DISC
-    C1233405381-GES_DISC
-    C1275819072-LAADSCDUAT
-    C1240560226-GES_DISC
-    C1240560267-GES_DISC
-    C1238658392-POCLOUD
-    C1238538232-POCLOUD
-    C1240560268-GES_DISC
-    C1242379923-GES_DISC
+  TEST_CONCEPT_IDS:
 
- 
 jobs:
   setup-and-chunk:
     runs-on: ubuntu-latest
