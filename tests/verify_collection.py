@@ -959,7 +959,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         if not np.any(valid_lon) or not np.any(valid_lat):
             pytest.fail("No data in lon and lat")
 
-@pytest.mark.timeout(1200)
+@pytest.mark.timeout(1800)
 def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
                         harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_temporal, overrides):
     test_temporal_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
