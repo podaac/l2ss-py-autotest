@@ -867,7 +867,7 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             raise
 
     # Verify spatial subset worked
-    subsetted_tree = xr.load_datatree(subsetted_filepath, decode_times=False)
+    subsetted_tree = xr.open_datatree(subsetted_filepath, decode_times=False)
     group = None
     lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_tree, collection_variables)
 
