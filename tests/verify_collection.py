@@ -756,7 +756,7 @@ def create_smaller_bounding_box(east, west, north, south, scale_factor):
     return smaller_east, smaller_west, smaller_north, smaller_south
 
 
-def get_lat_lon_var_names(tree: xr.DataTree, file_to_subset: str, collection_variable_list: List[Dict], collection_concept_id: str):
+def get_lat_lon_var_names(tree: xr.DataTree, collection_variable_list: List[Dict]):
     dataset = tree.ds
     # Try getting it from UMM-Var first
     lat_var_json, lon_var_json, _ = get_coordinate_vars_from_umm(collection_variable_list)
@@ -768,6 +768,19 @@ def get_lat_lon_var_names(tree: xr.DataTree, file_to_subset: str, collection_var
 
     logging.warning("Unable to find lat/lon vars in UMM-Var")
 
+    # try using l2ss-py directly
+    try:
+        # use l2ss-py to find lat and lon names directly from the tree
+        lat_var_names, lon_var_names, _ = coordinate_utils.get_coordinate_variable_names(tree)
+
+        if lat_var_names and lon_var_names:
+            lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
+            lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
+            return lat_var_name, lon_var_name
+
+    except ValueError:
+        logging.warning("Unable to find lat/lon vars using l2ss-py")
+
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
     try:
         latitude = [lat for lat in dataset.cf.coordinates['latitude']
@@ -777,26 +790,6 @@ def get_lat_lon_var_names(tree: xr.DataTree, file_to_subset: str, collection_var
         return latitude, longitude
     except:
         logging.warning("Unable to find lat/lon vars using cf_xarray")
-
-    # If that still doesn't work, try using l2ss-py directly
-    try:
-        filename = f'my_copy_file_{collection_concept_id}.nc'
-        shutil.copy(file_to_subset, filename)
-        data_tree = xr.open_datatree(filename, decode_times=False)
-
-        # use l2ss-py to find lat and lon names
-        lat_var_names, lon_var_names, _ = coordinate_utils.get_coordinate_variable_names(data_tree)
-
-        if lat_var_names and lon_var_names:
-            lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
-            lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
-            return lat_var_name, lon_var_name
-        
-    except ValueError:
-        logging.warning("Unable to find lat/lon vars using l2ss-py")
-    finally:
-        if os.path.exists(filename):
-            os.remove(filename)
 
     # Still no dice, try using the 'units' variable attribute
     for coord_name, coord in dataset.coords.items():
@@ -874,9 +867,9 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             raise
 
     # Verify spatial subset worked
-    subsetted_tree = xr.open_datatree(subsetted_filepath, decode_times=False)
+    subsetted_tree = xr.load_datatree(subsetted_filepath, decode_times=False)
     group = None
-    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_tree, subsetted_filepath, collection_variables, collection_concept_id)
+    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_tree, collection_variables)
 
     assert lat_var_name and lon_var_name
 

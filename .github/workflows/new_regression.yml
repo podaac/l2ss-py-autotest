@@ -16,6 +16,36 @@ on:
           - ops
           - uat
 
+env:
+  # Edit this list for ad hoc testing. Leave blank to run the full set.
+  #TEST_CONCEPT_IDS: ''
+  TEST_CONCEPT_IDS: |
+    C1240560262-GES_DISC
+    C1240560263-GES_DISC
+    C1238658392-POCLOUD
+    C1240560226-GES_DISC
+    C1257081728-POCLOUD
+    C1275819072-LAADSCDUAT
+    C1240560267-GES_DISC
+    C1242379923-GES_DISC
+    C1229667727-GES_DISC
+    C1240560268-GES_DISC
+    C1243658323-GES_DISC
+    C1233154410-GES_DISC
+    C1238538232-POCLOUD
+    C1233405381-GES_DISC
+    C1244165126-GES_DISC
+    C1244165134-GES_DISC
+    C1244165137-GES_DISC
+    C1244165142-GES_DISC
+    C1240560272-GES_DISC
+    C1262374445-GES_DISC
+    C1244165143-GES_DISC
+    C1262787881-GES_DISC
+    C1244165138-GES_DISC
+    C1244165147-GES_DISC
+
+ 
 jobs:
   setup-and-chunk:
     runs-on: ubuntu-latest
@@ -104,9 +134,54 @@ jobs:
         id: generate_chunks
         env:
           ENV: ${{ steps.prepare.outputs.environment }}
+          CONCEPT_IDS: ${{ env.TEST_CONCEPT_IDS }}
         run: |
           shopt -s nullglob
           files=(tests/cmr/l2ss-py/${ENV}/*)
+
+          if [ -n "${CONCEPT_IDS:-}" ]; then
+            mapfile -t requested_ids < <(
+              printf '%s\n' "$CONCEPT_IDS" \
+                | tr ',\r' '\n\n' \
+                | sed '/^[[:space:]]*$/d; s/^[[:space:]]*//; s/[[:space:]]*$//'
+            )
+
+            if [ "${#requested_ids[@]}" -eq 0 ]; then
+              echo "No valid concept IDs were provided in concept_ids."
+              echo "matrix_chunks=[]" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            declare -A requested_map=()
+            for concept_id in "${requested_ids[@]}"; do
+              requested_map["$concept_id"]=1
+            done
+
+            filtered_files=()
+            declare -A found_map=()
+            for file in "${files[@]}"; do
+              concept_id="$(basename "$file")"
+              if [ -n "${requested_map[$concept_id]+x}" ]; then
+                filtered_files+=("$file")
+                found_map["$concept_id"]=1
+              fi
+            done
+
+            missing_ids=()
+            for concept_id in "${requested_ids[@]}"; do
+              if [ -z "${found_map[$concept_id]+x}" ]; then
+                missing_ids+=("$concept_id")
+              fi
+            done
+
+            if [ "${#missing_ids[@]}" -gt 0 ]; then
+              echo "The following concept IDs were not found under tests/cmr/l2ss-py/${ENV}: ${missing_ids[*]}"
+              exit 1
+            fi
+
+            files=("${filtered_files[@]}")
+          fi
+
           total=${#files[@]}
 
           if [ "$total" -eq 0 ]; then
