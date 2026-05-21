@@ -216,8 +216,7 @@ jobs:
   aggregate-failures:
     needs: [setup-and-chunk, process-chunks]
     runs-on: ubuntu-latest
-    if: false
-    # if: ${{ always() && needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.edl_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
+    if: ${{ always() && needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.edl_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
@@ -280,8 +279,7 @@ jobs:
   update-alert-issue:
     needs: setup-and-chunk
     runs-on: ubuntu-latest
-    if: false
-    #if: ${{ always() && (needs.setup-and-chunk.outputs.harmony_status != 'up' || needs.setup-and-chunk.outputs.edl_status != 'up') }}
+    if: ${{ always() && (needs.setup-and-chunk.outputs.harmony_status != 'up' || needs.setup-and-chunk.outputs.edl_status != 'up') }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
