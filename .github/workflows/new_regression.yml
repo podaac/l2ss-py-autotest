@@ -20,30 +20,16 @@ env:
   # Edit this list for ad hoc testing. Leave blank to run the full set.
   #TEST_CONCEPT_IDS: ''
   TEST_CONCEPT_IDS: |
-    C1240560262-GES_DISC
     C1240560263-GES_DISC
-    C1238658392-POCLOUD
-    C1240560226-GES_DISC
-    C1257081728-POCLOUD
-    C1275819072-LAADSCDUAT
-    C1240560267-GES_DISC
-    C1242379923-GES_DISC
-    C1229667727-GES_DISC
-    C1240560268-GES_DISC
-    C1243658323-GES_DISC
-    C1233154410-GES_DISC
-    C1238538232-POCLOUD
+    C1240560262-GES_DISC
     C1233405381-GES_DISC
-    C1244165126-GES_DISC
-    C1244165134-GES_DISC
-    C1244165137-GES_DISC
-    C1244165142-GES_DISC
-    C1240560272-GES_DISC
-    C1262374445-GES_DISC
-    C1244165143-GES_DISC
-    C1262787881-GES_DISC
-    C1244165138-GES_DISC
-    C1244165147-GES_DISC
+    C1275819072-LAADSCDUAT
+    C1240560226-GES_DISC
+    C1240560267-GES_DISC
+    C1238658392-POCLOUD
+    C1238538232-POCLOUD
+    C1240560268-GES_DISC
+    C1242379923-GES_DISC
 
  
 jobs:
@@ -56,7 +42,7 @@ jobs:
       edl_status: ${{ steps.record-edl-status.outputs.edl_status }}
       matrix_chunks: ${{ steps.generate_chunks.outputs.matrix_chunks }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Determine Environment
         id: prepare
@@ -246,15 +232,15 @@ jobs:
     # if: ${{ always() && needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.edl_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
+        uses: abatilo/actions-poetry@v4
         with:
           poetry-version: 2.3.2
 
@@ -262,7 +248,7 @@ jobs:
         run: poetry install
 
       - name: Download all job status artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: job-status-*
           path: job-status
@@ -284,7 +270,7 @@ jobs:
           esac
 
       - name: Configure AWS credentials for UAT
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
@@ -310,15 +296,15 @@ jobs:
     #if: ${{ always() && (needs.setup-and-chunk.outputs.harmony_status != 'up' || needs.setup-and-chunk.outputs.edl_status != 'up') }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
+        uses: abatilo/actions-poetry@v4
         with:
           poetry-version: 2.3.2
 
