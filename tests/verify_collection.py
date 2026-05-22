@@ -775,13 +775,11 @@ def get_lat_lon_var_names(tree: xr.DataTree, collection_variable_list: List[Dict
         if lat_var_names and lon_var_names:
             lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
             lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
-            print('l2ss-py function got lon lat')
             return lat_var_name, lon_var_name
 
     except ValueError:
         logging.warning("Unable to find lat/lon vars using l2ss-py")
 
-    print("WHAT IN THE WORLD")
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
     try:
         latitude = [lat for lat in dataset.cf.coordinates['latitude']
