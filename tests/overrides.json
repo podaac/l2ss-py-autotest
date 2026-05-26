@@ -1,0 +1,10 @@
+{
+  "providers": {
+    "LAADS": {
+      "skip_temporal": true
+    },
+    "OB_CLOUD": {
+      "skip_temporal": true
+    }
+  }
+}
