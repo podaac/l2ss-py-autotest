@@ -44,7 +44,7 @@ That means:
 These are the main overrides for the default spatial and temporal tests.
 
 - `generic_mode`: controls the generic spatial and temporal tests together. Use `all`, `spatial`, `temporal`, or `none`.
-- `spatial_bbox`: overrides the spatial area used to choose the granule and build the spatial Harmony request.
+- `spatial_bbox`: overrides the spatial area used to choose the granule and build the spatial Harmony request. Use a 4-item list in `min lon, min lat, max lon, max lat` order, for example `[-10, 20, 10, 40]`.
 - `granule_concept_id`: forces the test to use a specific granule instead of selecting one from CMR.
 
 ## Advanced Tuning
@@ -123,6 +123,8 @@ That disables the generic spatial and temporal tests for every collection under 
 For provider overrides, use `generic_mode` or `replace_generic` instead.
 
 In `overrides.json`, add `spatial_bbox` to a collection's override block to force the spatial test to use a specific bbox:
+
+For example:
 
 ```
 {
