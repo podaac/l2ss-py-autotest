@@ -7,7 +7,7 @@ import create_or_update_issue
 from groq import Groq
 import time
 import re
-from verify_collection import find_custom_tests, read_overrides_file, resolve_overrides
+from verify_collection import find_custom_tests, read_overrides_file, resolve_overrides, validate_overrides_config
 
 try:
     os.environ['CMR_USER']
@@ -185,6 +185,7 @@ def pytest_collection_modifyitems(config, items):
     if not overrides_file:
         overrides_file = os.path.join(os.path.dirname(__file__), "overrides.json")
     overrides = read_overrides_file(overrides_file)
+    validate_overrides_config(overrides, overrides_file)
     collection_overrides = resolve_overrides(overrides, concept_id)
 
     should_skip_generic = (
