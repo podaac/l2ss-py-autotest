@@ -7,6 +7,7 @@ import create_or_update_issue
 from groq import Groq
 import time
 import re
+from verify_collection import find_custom_tests, read_overrides_file, resolve_overrides, validate_overrides_config
 
 try:
     os.environ['CMR_USER']
@@ -54,9 +55,25 @@ def pytest_addoption(parser):
         default=os.environ.get("CMR_TOKEN_PROVIDER", "direct"),
         help="Token source: direct EDL token API or Lambda token provider",
     )
+    parser.addoption(
+        "--override-file",
+        action="store",
+        default=os.environ.get("L2SS_OVERRIDES_FILE"),
+        help="Path to JSON overrides for per-provider or per-collection test behavior",
+    )
 
     group = parser.getgroup('test_mode')
     group.addoption("--concept_id", action="store", help="Concept ID of single collection to test")
+    group.addoption(
+        "--granule_concept_id",
+        action="store",
+        help="Concept ID of a specific granule to use for testing",
+    )
+    group.addoption(
+        "--bbox",
+        action="store",
+        help="Spatial bounding box for testing, formatted as west,south,east,north",
+    )
     group.addoption("--regression", action="store_true", help="Run tests for all known collection associations")
 
 
@@ -78,6 +95,7 @@ def pytest_generate_tests(metafunc):
 @pytest.fixture(scope="session", autouse=True)
 def log_global_env_facts(record_testsuite_property, request):
     record_testsuite_property("concept_id", request.config.getoption('concept_id'))
+    record_testsuite_property("granule_concept_id", request.config.getoption('granule_concept_id'))
     record_testsuite_property("env", request.config.getoption('env'))
 
 
@@ -152,6 +170,44 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             if tests:
                 print(f'{outcome.capitalize()} Tests')
                 print(tests)
-                file_path = f'{env}_{outcome}.json'
-                with open(file_path, 'w') as file:
-                    json.dump(tests, file)
+
+
+def pytest_collection_modifyitems(config, items):
+    concept_id = config.getoption("concept_id")
+    if not concept_id:
+        return
+
+    custom = find_custom_tests(concept_id, config.getoption("env"))
+    if not custom.get("any"):
+        return
+
+    overrides_file = config.getoption("override_file")
+    if not overrides_file:
+        overrides_file = os.path.join(os.path.dirname(__file__), "overrides.json")
+    overrides = read_overrides_file(overrides_file)
+    validate_overrides_config(overrides, overrides_file)
+    collection_overrides = resolve_overrides(overrides, concept_id)
+
+    should_skip_generic = (
+        (custom.get("collection") or custom.get("group"))
+        and not collection_overrides.get("also_run_generic", False)
+    ) or (
+        custom.get("provider")
+        and collection_overrides.get("replace_generic", False)
+    )
+
+    if not should_skip_generic:
+        return
+
+    deselected = []
+    kept = []
+    for item in items:
+        base_name = getattr(item, "originalname", None) or item.name
+        if base_name in ("test_spatial_subset", "test_temporal_subset"):
+            deselected.append(item)
+        else:
+            kept.append(item)
+
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = kept

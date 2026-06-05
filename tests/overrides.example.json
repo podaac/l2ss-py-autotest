@@ -1,0 +1,38 @@
+{
+  "providers": {
+    "GES_DISC": {
+      "skip_temporal": true,
+      "spatial_bbox_scale": 0.9
+    }
+  },
+  "collections": {
+    "C1234567890-GES_DISC": {
+      "skip_spatial": true,
+      "generic_mode": "none"
+    },
+    "C9876543210-GES_DISC": {
+      "force_temporal": true,
+      "temporal_fraction": 0.25,
+      "spatial_bbox": [-10, 20, 10, 40],
+      "granule_concept_id": "G1234567890-GES_DISC"
+    }
+  },
+  "collection_groups": {
+    "GES_DISC_SPECIAL": {
+      "members": [
+        "C1234567890-GES_DISC",
+        "C1111111111-GES_DISC"
+      ],
+      "skip_temporal": true,
+      "generic_mode": "spatial",
+      "spatial_bbox_scale": 0.9,
+      "spatial_bbox": {
+        "west": -15,
+        "south": 25,
+        "east": 5,
+        "north": 45
+      },
+      "granule_concept_id": "G9876543210-GES_DISC"
+    }
+  }
+}

@@ -16,6 +16,10 @@ on:
           - ops
           - uat
 
+env:
+  # Edit this list for ad hoc testing. Leave blank to run the full set.
+  TEST_CONCEPT_IDS:
+
 jobs:
   setup-and-chunk:
     runs-on: ubuntu-latest
@@ -26,7 +30,7 @@ jobs:
       edl_status: ${{ steps.record-edl-status.outputs.edl_status }}
       matrix_chunks: ${{ steps.generate_chunks.outputs.matrix_chunks }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Determine Environment
         id: prepare
@@ -104,9 +108,54 @@ jobs:
         id: generate_chunks
         env:
           ENV: ${{ steps.prepare.outputs.environment }}
+          CONCEPT_IDS: ${{ env.TEST_CONCEPT_IDS }}
         run: |
           shopt -s nullglob
           files=(tests/cmr/l2ss-py/${ENV}/*)
+
+          if [ -n "${CONCEPT_IDS:-}" ]; then
+            mapfile -t requested_ids < <(
+              printf '%s\n' "$CONCEPT_IDS" \
+                | tr ',\r' '\n\n' \
+                | sed '/^[[:space:]]*$/d; s/^[[:space:]]*//; s/[[:space:]]*$//'
+            )
+
+            if [ "${#requested_ids[@]}" -eq 0 ]; then
+              echo "No valid concept IDs were provided in concept_ids."
+              echo "matrix_chunks=[]" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            declare -A requested_map=()
+            for concept_id in "${requested_ids[@]}"; do
+              requested_map["$concept_id"]=1
+            done
+
+            filtered_files=()
+            declare -A found_map=()
+            for file in "${files[@]}"; do
+              concept_id="$(basename "$file")"
+              if [ -n "${requested_map[$concept_id]+x}" ]; then
+                filtered_files+=("$file")
+                found_map["$concept_id"]=1
+              fi
+            done
+
+            missing_ids=()
+            for concept_id in "${requested_ids[@]}"; do
+              if [ -z "${found_map[$concept_id]+x}" ]; then
+                missing_ids+=("$concept_id")
+              fi
+            done
+
+            if [ "${#missing_ids[@]}" -gt 0 ]; then
+              echo "The following concept IDs were not found under tests/cmr/l2ss-py/${ENV}: ${missing_ids[*]}"
+              exit 1
+            fi
+
+            files=("${filtered_files[@]}")
+          fi
+
           total=${#files[@]}
 
           if [ "$total" -eq 0 ]; then
@@ -170,15 +219,15 @@ jobs:
     if: ${{ always() && needs.setup-and-chunk.outputs.harmony_status == 'up' && needs.setup-and-chunk.outputs.edl_status == 'up' && needs.setup-and-chunk.outputs.matrix_chunks != '[]' && needs.setup-and-chunk.outputs.matrix_chunks != '' }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
+        uses: abatilo/actions-poetry@v4
         with:
           poetry-version: 2.3.2
 
@@ -186,7 +235,7 @@ jobs:
         run: poetry install
 
       - name: Download all job status artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: job-status-*
           path: job-status
@@ -208,7 +257,7 @@ jobs:
           esac
 
       - name: Configure AWS credentials for UAT
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
@@ -219,6 +268,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           REGRESSION_ENV: ${{ needs.setup-and-chunk.outputs.environment_upper }}
+          CMR_TOKEN_LAMBDA_FUNCTION_NAME: ${{ needs.setup-and-chunk.outputs.environment }}-launchpad_token_dispenser
+          CMR_TOKEN_LAMBDA_REGION: us-west-2
           CMR_USER: ${{ secrets.CMR_USER }}
           CMR_PASS: ${{ secrets.CMR_PASS }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -231,15 +282,15 @@ jobs:
     if: ${{ always() && (needs.setup-and-chunk.outputs.harmony_status != 'up' || needs.setup-and-chunk.outputs.edl_status != 'up') }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
+        uses: abatilo/actions-poetry@v4
         with:
           poetry-version: 2.3.2
 

@@ -3,27 +3,32 @@ import logging
 import os
 import pathlib
 import shutil
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 
 import cf_xarray as cfxr
 import harmony
-import netCDF4
 import numpy as np
-import podaac.subsetter.subset
+from podaac.subsetter.utils import coordinate_utils
 import pytest
 import requests
-import xarray
+import xarray as xr
 import csv
 
 import cmr
 import token_utils
 
+import importlib.util
+import inspect
+
 VALID_LATITUDE_VARIABLE_NAMES = ['lat', 'latitude']
 VALID_LONGITUDE_VARIABLE_NAMES = ['lon', 'longitude']
 
 assert cfxr, "cf_xarray adds extensions to xarray on import"
-GROUP_DELIM = '__'
+DEFAULT_SPATIAL_BBOX_SCALE = 0.95
+DEFAULT_TEMPORAL_FRACTION = 0.5
+CUSTOM_TESTS_DIRNAME = "custom"
+CUSTOM_GROUPS_DIRNAME = "groups"
 
 
 def fetch_bearer_token_by_provider(env: str, request_session: requests.Session, token_provider: str) -> str:
@@ -81,6 +86,383 @@ def read_skip_list(csv_file):
         reader = csv.reader(f)
         return {row[0].strip() for row in reader}
 
+def normalize_provider_name(name: str) -> str:
+    if not name:
+        return ""
+    return name.strip().upper().replace("-", "_").replace(" ", "_")
+
+
+def parse_provider_from_concept_id(collection_concept_id: str) -> str:
+    if not collection_concept_id or "-" not in collection_concept_id:
+        return ""
+    return normalize_provider_name(collection_concept_id.split("-")[-1])
+
+
+def read_overrides_file(path: str) -> dict:
+    if not path or not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+def validate_overrides_config(overrides: dict, overrides_file: str) -> None:
+    if not overrides:
+        return
+
+    groups = overrides.get("collection_groups", {}) or {}
+    member_to_groups = {}
+
+    for group_name, group in groups.items():
+        if not isinstance(group, dict):
+            pytest.fail(f"Invalid collection_groups entry '{group_name}' in {overrides_file}: expected an object.")
+
+        members = group.get("members", [])
+        if not isinstance(members, list):
+            pytest.fail(f"Invalid collection_groups entry '{group_name}' in {overrides_file}: 'members' must be a list.")
+
+        for member in members:
+            member_to_groups.setdefault(member, []).append(group_name)
+
+    conflicts = {member: group_names for member, group_names in member_to_groups.items() if len(group_names) > 1}
+    if conflicts:
+        details = ", ".join(f"{member} -> {', '.join(group_names)}" for member, group_names in sorted(conflicts.items()))
+        pytest.fail(
+            f"Invalid overrides config in {overrides_file}: some collections appear in multiple collection_groups: {details}. "
+            "A collection may belong to only one collection_groups entry."
+        )
+
+
+def parse_spatial_bbox(value) -> Optional[Tuple[float, float, float, float]]:
+    if value is None or value == "":
+        return None
+
+    if isinstance(value, dict):
+        keys = ("west", "south", "east", "north")
+        try:
+            return tuple(float(value[key]) for key in keys)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("bbox override must contain west, south, east, and north") from exc
+
+    if isinstance(value, (list, tuple)) and len(value) == 4:
+        try:
+            return tuple(float(part) for part in value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("bbox override must contain numeric west, south, east, north values") from exc
+
+    if isinstance(value, str):
+        parts = [part.strip() for part in value.split(",")]
+        if len(parts) != 4:
+            raise ValueError("bbox must be formatted as west,south,east,north")
+        try:
+            return tuple(float(part) for part in parts)
+        except ValueError as exc:
+            raise ValueError("bbox must be formatted as west,south,east,north with numeric values") from exc
+
+    raise ValueError("bbox must be provided as a comma-separated string, 4-item list, or dict")
+
+
+def resolve_overrides(overrides: dict, collection_concept_id: str) -> dict:
+    if not overrides:
+        return {}
+
+    provider = parse_provider_from_concept_id(collection_concept_id)
+
+    provider_overrides = {}
+    providers = overrides.get("providers", {})
+    if provider:
+        provider_overrides = providers.get(provider, {})
+
+    collection_overrides = {}
+    collections = overrides.get("collections", {})
+    if collection_concept_id in collections:
+        collection_overrides = collections[collection_concept_id] or {}
+    else:
+        # Case-insensitive key matching for convenience
+        for key, value in collections.items():
+            if key.lower() == collection_concept_id.lower():
+                collection_overrides = value or {}
+                break
+
+    group_overrides = {}
+    groups = overrides.get("collection_groups", {}) or {}
+    for _, group in groups.items():
+        members = group.get("members", []) if isinstance(group, dict) else []
+        if collection_concept_id in members:
+            group_overrides.update({k: v for k, v in group.items() if k != "members"})
+
+    # Collection overrides win over provider overrides
+    return {**provider_overrides, **group_overrides, **collection_overrides}
+
+
+def resolve_spatial_bbox(pytestconfig, collection_overrides: dict) -> Tuple[float, float, float, float] | None:
+    configured = pytestconfig.getoption("bbox")
+    if configured:
+        return parse_spatial_bbox(configured)
+
+    override_bbox = collection_overrides.get("spatial_bbox")
+    if override_bbox is not None:
+        return parse_spatial_bbox(override_bbox)
+
+    return None
+
+
+@pytest.fixture(scope="function")
+def granule_concept_id(pytestconfig, overrides, collection_concept_id):
+    collection_overrides = resolve_overrides(overrides, collection_concept_id)
+    configured = pytestconfig.getoption("granule_concept_id")
+    if configured:
+        return configured
+    override_granule = collection_overrides.get("granule_concept_id")
+    if override_granule:
+        return override_granule
+    return None
+
+
+@pytest.fixture(scope="function")
+def spatial_bbox(pytestconfig, overrides, collection_concept_id):
+    collection_overrides = resolve_overrides(overrides, collection_concept_id)
+    return resolve_spatial_bbox(pytestconfig, collection_overrides)
+
+
+def _custom_tests_root() -> pathlib.Path:
+    return pathlib.Path(__file__).parent.joinpath(CUSTOM_TESTS_DIRNAME)
+
+
+def _normalize_env(env: str) -> str:
+    if not env:
+        return ""
+    env = str(env).strip().lower()
+    return env if env in {"uat", "ops"} else ""
+
+
+def _custom_groups_root() -> pathlib.Path:
+    return _custom_tests_root().joinpath(CUSTOM_GROUPS_DIRNAME)
+
+
+def _env_groups_root(env: str) -> pathlib.Path:
+    env = _normalize_env(env)
+    return _custom_groups_root().joinpath(env) if env else _custom_groups_root()
+
+
+def _provider_custom_file(provider: str) -> pathlib.Path:
+    return _custom_tests_root().joinpath("providers", f"{provider}.py")
+
+
+def _collection_custom_file_candidates(collection_concept_id: str, env: str) -> list:
+    env = _normalize_env(env)
+    base = _custom_tests_root().joinpath("collections", f"{collection_concept_id}.py")
+    if not env:
+        return [base]
+    env_path = _custom_tests_root().joinpath("collections", env, f"{collection_concept_id}.py")
+    return [env_path, base]
+
+
+def _collection_custom_dir_candidates(collection_concept_id: str, env: str) -> list:
+    env = _normalize_env(env)
+    base = _custom_tests_root().joinpath("collections", collection_concept_id)
+    if not env:
+        return [base]
+    env_path = _custom_tests_root().joinpath("collections", env, collection_concept_id)
+    return [env_path, base]
+
+
+def _collection_custom_dir_has_tests(collection_concept_id: str, env: str) -> bool:
+    for collection_dir in _collection_custom_dir_candidates(collection_concept_id, env):
+        if not collection_dir.exists() or not collection_dir.is_dir():
+            continue
+        for path in collection_dir.rglob("*.py"):
+            if path.name.startswith("test_") or path.name.endswith("_test.py"):
+                return True
+    return False
+
+
+def _group_concept_ids_file(group_dir: pathlib.Path) -> pathlib.Path:
+    return group_dir.joinpath("concept_ids.json")
+
+
+def _load_group_concept_ids(group_dir: pathlib.Path) -> list:
+    path = _group_concept_ids_file(group_dir)
+    if not path.exists():
+        return []
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except Exception:
+        return []
+    if isinstance(data, dict):
+        members = data.get("members", [])
+        return members if isinstance(members, list) else []
+    return data if isinstance(data, list) else []
+
+
+def _group_dir_has_tests(group_dir: pathlib.Path) -> bool:
+    if not group_dir.exists() or not group_dir.is_dir():
+        return False
+    for path in group_dir.rglob("*.py"):
+        if path.name.startswith("test_") or path.name.endswith("_test.py"):
+            return True
+    return False
+
+
+def _matching_group_dirs(collection_concept_id: str, env: str) -> list:
+    env_root = _env_groups_root(env)
+    matches = []
+    env_group_names = set()
+    if env_root.exists() and env_root.is_dir():
+        for group_dir in sorted(env_root.iterdir()):
+            if not group_dir.is_dir():
+                continue
+            env_group_names.add(group_dir.name)
+            members = _load_group_concept_ids(group_dir)
+            if collection_concept_id in members and _group_dir_has_tests(group_dir):
+                matches.append(group_dir)
+
+    base_root = _custom_groups_root()
+    if base_root.exists() and base_root.is_dir():
+        for group_dir in sorted(base_root.iterdir()):
+            if not group_dir.is_dir():
+                continue
+            if group_dir.name in env_group_names:
+                continue
+            members = _load_group_concept_ids(group_dir)
+            if collection_concept_id in members and _group_dir_has_tests(group_dir):
+                matches.append(group_dir)
+    return matches
+
+
+def _first_existing_path(candidates: list) -> Optional[pathlib.Path]:
+    for path in candidates:
+        if path.exists():
+            return path
+    return None
+
+
+def find_custom_tests(collection_concept_id: str, env: str) -> dict:
+    provider = parse_provider_from_concept_id(collection_concept_id)
+    provider_file = _provider_custom_file(provider) if provider else None
+    collection_file = _first_existing_path(_collection_custom_file_candidates(collection_concept_id, env))
+    has_provider = bool(provider_file and provider_file.exists())
+    has_collection = bool(collection_file and collection_file.exists()) or _collection_custom_dir_has_tests(collection_concept_id, env)
+    group_dirs = _matching_group_dirs(collection_concept_id, env)
+    has_group = bool(group_dirs)
+    return {
+        "provider": has_provider,
+        "collection": has_collection,
+        "group": has_group,
+        "groups": [p.name for p in group_dirs],
+        "any": has_provider or has_collection or has_group,
+    }
+
+
+def _load_custom_test_functions(path: pathlib.Path):
+    if not path or not path.exists():
+        return []
+
+    module_name = f"custom_{abs(hash(str(path)))}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if not spec or not spec.loader:
+        return []
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    functions = []
+    for name, obj in inspect.getmembers(module, inspect.isfunction):
+        if name.startswith("test_"):
+            functions.append((name, obj))
+    return functions
+
+
+def _load_custom_dir_test_functions(collection_concept_id: str, env: str):
+    functions = []
+    collection_dir = _first_existing_path(_collection_custom_dir_candidates(collection_concept_id, env))
+    if not collection_dir or not collection_dir.exists() or not collection_dir.is_dir():
+        return functions
+    for path in collection_dir.rglob("*.py"):
+        if path.name.startswith("test_") or path.name.endswith("_test.py"):
+            functions.extend(_load_custom_test_functions(path))
+    return functions
+
+
+def _load_group_test_functions(collection_concept_id: str, env: str):
+    functions = []
+    for group_dir in _matching_group_dirs(collection_concept_id, env):
+        for path in group_dir.rglob("*.py"):
+            if path.name.startswith("test_") or path.name.endswith("_test.py"):
+                functions.extend(_load_custom_test_functions(path))
+    return functions
+
+
+def _run_custom_tests_for_collection(collection_concept_id: str, env: str, request):
+    provider = parse_provider_from_concept_id(collection_concept_id)
+    provider_file = _provider_custom_file(provider) if provider else None
+    collection_file = _first_existing_path(_collection_custom_file_candidates(collection_concept_id, env))
+
+    functions = []
+    functions.extend(_load_custom_test_functions(collection_file))
+    functions.extend(_load_custom_dir_test_functions(collection_concept_id, env))
+    if not functions:
+        functions.extend(_load_group_test_functions(collection_concept_id, env))
+    if not functions:
+        functions.extend(_load_custom_test_functions(provider_file))
+
+    if not functions:
+        pytest.skip(f"No custom tests found for {collection_concept_id}")
+
+    for name, func in functions:
+        kwargs = {}
+        for param in inspect.signature(func).parameters:
+            kwargs[param] = request.getfixturevalue(param)
+        try:
+            func(**kwargs)
+        except Exception as exc:
+            raise AssertionError(f"Custom test {name} failed") from exc
+
+
+@pytest.mark.timeout(1200)
+def test_custom_collection_or_provider(collection_concept_id, env, request):
+    _run_custom_tests_for_collection(collection_concept_id, env, request)
+
+
+def _normalize_generic_mode(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return "all" if value else "none"
+
+    mode = str(value).strip().lower()
+    aliases = {
+        "true": "all",
+        "false": "none",
+        "on": "all",
+        "off": "none",
+        "both": "all",
+        "all": "all",
+        "none": "none",
+        "spatial": "spatial",
+        "temporal": "temporal",
+        "auto": None,
+    }
+    if mode not in aliases:
+        raise ValueError("generic_mode must be one of: all, spatial, temporal, none, auto")
+    return aliases[mode]
+
+
+def should_run_generic(test_kind: str, overrides: dict) -> bool:
+    """
+    Determine whether to run generic tests.
+    Supported override keys:
+      - generic_mode (all, spatial, temporal, none)
+    """
+    generic_mode = _normalize_generic_mode(overrides.get("generic_mode"))
+    if generic_mode == "none":
+        return False
+    if generic_mode == "all":
+        return True
+    if generic_mode == "spatial":
+        return test_kind == "spatial"
+    if generic_mode == "temporal":
+        return test_kind == "temporal"
+    return True
 
 # Fixture for the first skip list (skip_collections1.csv)
 @pytest.fixture(scope="session")
@@ -97,6 +479,23 @@ def skip_spatial(env):
     path = os.path.join(current_dir, f"skip/skip_spatial_{env}.csv")
     return read_skip_list(path)
 
+@pytest.fixture(scope="session")
+def overrides_file(pytestconfig):
+    configured = pytestconfig.getoption("override_file")
+    if configured:
+        return configured
+    current_dir = os.path.dirname(__file__)
+    return os.path.join(current_dir, "overrides.json")
+
+
+@pytest.fixture(scope="session")
+def overrides(overrides_file):
+    try:
+        data = read_overrides_file(overrides_file)
+        validate_overrides_config(data, overrides_file)
+        return data
+    except Exception as exc:
+        pytest.fail(f"Unable to read overrides file at {overrides_file}: {exc}")
 
 @pytest.fixture(scope="session")
 def bearer_token_manager(env: str, request_session: requests.Session, token_provider: str):
@@ -134,7 +533,7 @@ def authed_request(request_session: requests.Session, bearer_token_manager):
 
 
 @pytest.fixture(scope="function")
-def granule_json(collection_concept_id: str, cmr_mode: str, authed_request) -> dict:
+def granule_json(collection_concept_id: str, cmr_mode: str, authed_request, spatial_bbox, granule_concept_id) -> dict:
     '''
     This fixture defines the strategy used for picking a granule from a collection for testing
 
@@ -148,7 +547,13 @@ def granule_json(collection_concept_id: str, cmr_mode: str, authed_request) -> d
     -------
     umm_json for selected granule
     '''
-    cmr_url = f"{cmr_mode}granules.umm_json?collection_concept_id={collection_concept_id}&sort_key=-start_date&page_size=1"
+    if granule_concept_id:
+        cmr_url = f"{cmr_mode}granules.umm_json?concept_id={granule_concept_id}&page_size=1"
+    else:
+        cmr_url = f"{cmr_mode}granules.umm_json?collection_concept_id={collection_concept_id}&sort_key=-start_date&page_size=1"
+        if spatial_bbox:
+            west, south, east, north = spatial_bbox
+            cmr_url += f"&bounding_box={west},{south},{east},{north}"
 
     response_json = authed_request("GET", cmr_url).json()
 
@@ -213,8 +618,7 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token_mana
                 continue
             raise
 
-
-def _parse_datetime(value: str) -> datetime:
+def _parse_umm_datetime(value: str) -> datetime:
     for fmt in ('%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ'):
         try:
             return datetime.strptime(value, fmt)
@@ -223,11 +627,14 @@ def _parse_datetime(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
-def get_half_temporal_extent(start: str, end: str):
-    start_dt = _parse_datetime(start)
-    end_dt = _parse_datetime(end)
-    
-    # Calculate the total duration
+def get_middle_temporal_extent(start: str, end: str, fraction: float = DEFAULT_TEMPORAL_FRACTION):
+    # Adjust the format to handle cases without fractional seconds
+    start_dt = _parse_umm_datetime(start)
+    end_dt = _parse_umm_datetime(end)
+
+    if fraction <= 0 or fraction > 1:
+        raise ValueError(f"temporal_fraction must be within (0, 1], got {fraction}")
+
     total_duration = end_dt - start_dt
     
     # Calculate the half duration
@@ -311,8 +718,7 @@ def get_science_vars(collection_variable_list: List[Dict]):
 def get_variable_name_from_umm_json(variable_umm_json) -> str:
     if 'umm' in variable_umm_json and 'Name' in variable_umm_json['umm']:
         name = variable_umm_json['umm']['Name']
-
-        return "/".join(name.strip("/").split('/')[1:]) if '/' in name else name
+        return name
 
     return ""
 
@@ -349,7 +755,8 @@ def create_smaller_bounding_box(east, west, north, south, scale_factor):
     return smaller_east, smaller_west, smaller_north, smaller_south
 
 
-def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collection_variable_list: List[Dict], collection_concept_id: str):
+def get_lat_lon_var_names(tree: xr.DataTree, collection_variable_list: List[Dict]):
+    dataset = tree.ds
     # Try getting it from UMM-Var first
     lat_var_json, lon_var_json, _ = get_coordinate_vars_from_umm(collection_variable_list)
     lat_var_name = get_variable_name_from_umm_json(lat_var_json)
@@ -360,6 +767,19 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
 
     logging.warning("Unable to find lat/lon vars in UMM-Var")
 
+    # try using l2ss-py directly
+    try:
+        # use l2ss-py to find lat and lon names directly from the tree
+        lat_var_names, lon_var_names, _ = coordinate_utils.get_coordinate_variable_names(tree)
+
+        if lat_var_names and lon_var_names:
+            lat_var_name = lat_var_names if isinstance(lat_var_names, str) else lat_var_names[0]
+            lon_var_name = lon_var_names if isinstance(lon_var_names, str) else lon_var_names[0]
+            return lat_var_name, lon_var_name
+
+    except ValueError:
+        logging.warning("Unable to find lat/lon vars using l2ss-py")
+
     # If that doesn't work, try using cf-xarray to infer lat/lon variable names
     try:
         latitude = [lat for lat in dataset.cf.coordinates['latitude']
@@ -369,37 +789,6 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
         return latitude, longitude
     except:
         logging.warning("Unable to find lat/lon vars using cf_xarray")
-
-    # If that still doesn't work, try using l2ss-py directly
-    try:
-        # file not able to be flattened unless locally downloaded
-        filename = f'my_copy_file_{collection_concept_id}.nc'
-        shutil.copy(file_to_subset, filename)
-        nc_dataset = netCDF4.Dataset(filename, mode='r+')
-        # flatten the dataset
-        nc_dataset_flattened = podaac.subsetter.group_handling.transform_grouped_dataset(nc_dataset, filename)
-
-        args = {
-                'decode_coords': False,
-                'mask_and_scale': False,
-                'decode_times': False
-                }
-        
-        with xarray.open_dataset(
-            xarray.backends.NetCDF4DataStore(nc_dataset_flattened),
-            **args
-            ) as flat_dataset:
-                # use l2ss-py to find lat and lon names
-                lat_var_names, lon_var_names = podaac.subsetter.subset.compute_coordinate_variable_names(flat_dataset)
-
-        os.remove(filename)
-        if lat_var_names and lon_var_names:
-            lat_var_name = lat_var_names.split('__')[-1] if isinstance(lat_var_names, str) else lat_var_names[0].split('__')[-1]
-            lon_var_name = lon_var_names.split('__')[-1] if isinstance(lon_var_names, str) else lon_var_names[0].split('__')[-1]
-            return lat_var_name, lon_var_name
-        
-    except ValueError:
-        logging.warning("Unable to find lat/lon vars using l2ss-py")
 
     # Still no dice, try using the 'units' variable attribute
     for coord_name, coord in dataset.coords.items():
@@ -417,78 +806,35 @@ def get_lat_lon_var_names(dataset: xarray.Dataset, file_to_subset: str, collecti
     # Out of options, fail the test because we couldn't determine lat/lon variables
     pytest.fail(f"Unable to find latitude and longitude variables.")
 
-def find_variable(ds, var_name):
-    try:
-        var_ds = ds[var_name]
-    except KeyError:
-        var_ds = ds.get(var_name.rsplit("/", 1)[-1], None)
-    return var_ds
-
-def walk_netcdf_groups(subsetted_filepath, lat_var_name):
-
-    with netCDF4.Dataset(subsetted_filepath) as f:
-        group_list = []
-        subsetted_ds_new = None
-        
-        def group_walk(groups, nc_d, current_group):
-            nonlocal subsetted_ds_new
-            
-            # Check if the top group has lat or lon variable
-            if lat_var_name in nc_d.variables:
-                subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=current_group, decode_times=False)
-                return True  # Found latitude variable
-            
-            # Loop through the groups in the current layer
-            for g in groups:
-                # End the loop if we've already found latitude
-                if subsetted_ds_new:
-                    break
-                
-                # Check if the current group has latitude variable
-                if lat_var_name in nc_d.groups[g].variables:
-                    lat_group = '/'.join(group_list + [g])
-                    try:
-                        subsetted_ds_new = xarray.open_dataset(subsetted_filepath, group=lat_group, decode_times=False)
-                        
-                        # Add a science variable to the dataset if other groups are present
-                        if nc_d.groups[g].groups:
-                            data_group = next((v for v in nc_d.groups[g].groups if 'time' not in v.lower()), None)
-                            if data_group:
-                                g_data = f"{lat_group}/{data_group}"
-                                subsetted_ds_data = xarray.open_dataset(subsetted_filepath, group=g_data, decode_times=False)
-                                sci_var = list(subsetted_ds_data.variables.keys())[0]
-                                subsetted_ds_new['science_test'] = subsetted_ds_data[sci_var]
-                    except Exception as ex:
-                        print(f"Error while processing group {g}: {ex}")
-                        continue
-                    
-                    break  # Exit the loop once we found the latitude group
-
-                # Recursively call the function on the nested groups
-                if nc_d.groups[g].groups:
-                    group_list.append(g)
-                    found = group_walk(nc_d.groups[g].groups, nc_d.groups[g], g)
-                    group_list.pop()  # Clean up after recursion
-                    if found:
-                        break
-
-        group_walk(f.groups, f, '')
-        
-    return subsetted_ds_new
-
 @pytest.mark.timeout(1200)
 def test_spatial_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_spatial):
+                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_spatial, overrides, spatial_bbox):
     test_spatial_subset.__doc__ = f"Verify spatial subset for {collection_concept_id} in {env}"
 
-    if collection_concept_id in skip_spatial:
+    collection_overrides = resolve_overrides(overrides, collection_concept_id)
+    if not should_run_generic("spatial", collection_overrides):
+        pytest.skip(f"Generic spatial disabled for {collection_concept_id}")
+
+    custom_tests = find_custom_tests(collection_concept_id, env)
+    if (custom_tests.get("collection") or custom_tests.get("group")) and not collection_overrides.get("also_run_generic", False):
+        pytest.skip(f"Custom collection/group tests present; skipping generic spatial for {collection_concept_id}")
+    if custom_tests.get("provider") and collection_overrides.get("replace_generic", False):
+        pytest.skip(f"Custom provider tests present; skipping generic spatial for {collection_concept_id}")
+
+    if collection_overrides.get("skip_spatial"):
+        pytest.skip(f"Spatial override skip for {collection_concept_id}")
+    if collection_concept_id in skip_spatial and not collection_overrides.get("force_spatial"):
         pytest.skip(f"Known collection to skip for spatial testing {collection_concept_id}")
 
     logging.info("Using granule %s for test", granule_json['meta']['concept-id'])
 
-    # Compute a box that is smaller than the granule extent bounding box
-    north, south, east, west = get_bounding_box(granule_json)
-    east, west, north, south = create_smaller_bounding_box(east, west, north, south, .95)
+    # Compute a box that is smaller than the chosen spatial extent.
+    if spatial_bbox:
+        west, south, east, north = spatial_bbox
+    else:
+        north, south, east, west = get_bounding_box(granule_json)
+    spatial_scale = collection_overrides.get("spatial_bbox_scale", DEFAULT_SPATIAL_BBOX_SCALE)
+    east, west, north, south = create_smaller_bounding_box(east, west, north, south, float(spatial_scale))
 
     start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
     end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
@@ -520,14 +866,9 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
             raise
 
     # Verify spatial subset worked
-    subsetted_ds = xarray.open_dataset(subsetted_filepath, decode_times=False)
+    subsetted_tree = xr.open_datatree(subsetted_filepath, decode_times=False)
     group = None
-    # Try to read group in file
-    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_ds, subsetted_filepath, collection_variables, collection_concept_id)
-    lat_var_name = lat_var_name.split('/')[-1]
-    lon_var_name = lon_var_name.split('/')[-1]
-
-    subsetted_ds_new = walk_netcdf_groups(subsetted_filepath, lat_var_name)
+    lat_var_name, lon_var_name = get_lat_lon_var_names(subsetted_tree, collection_variables)
 
     assert lat_var_name and lon_var_name
 
@@ -538,43 +879,45 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     if science_vars:
         for var in science_vars:
             science_var_name = var['umm']['Name']
-            var_ds = find_variable(subsetted_ds_new, science_var_name)
-            if var_ds is not None:
+            candidate = subsetted_tree.get(science_var_name)
+            if isinstance(candidate, xr.DataArray):
+                var_ds = candidate
                 try:
-                    msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
+                    msk = np.logical_not(np.isnan(candidate.data.squeeze()))
                     break
                 except Exception:
                     continue
         else:
             var_ds, msk = None, None
     else:
-        for science_var_name in subsetted_ds_new.variables:
-            if (str(science_var_name) not in lat_var_name and 
-                str(science_var_name) not in lon_var_name and 
-                'time' not in str(science_var_name)):
-
-                var_ds = find_variable(subsetted_ds_new, science_var_name)
-                if var_ds is not None:
-                    try:
-                        msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-                        break
-                    except Exception:
-                        continue
-        else:
-            var_ds, msk = None, None
+        var_ds, msk = None, None
+        for node in subsetted_tree.subtree:
+            if node.is_empty:
+                continue
+            for science_var_name, var_candidate in node.data_vars.items():
+                if any(x in str(science_var_name) for x in (lat_var_name, lon_var_name, "time")):
+                    continue
+                try:
+                    msk = np.logical_not(np.isnan(var_candidate.data.squeeze()))
+                    var_ds = var_candidate
+                    break
+                except Exception:
+                    continue
+            if var_ds is not None:
+                break
 
     if var_ds is None or msk is None:
         logging.warning("Unable to find a science variable to use. Proceeding to test longitude and latitude only.")
-        llat = subsetted_ds_new[lat_var_name]
-        llon = subsetted_ds_new[lon_var_name]
+        llat = subsetted_tree[lat_var_name]
+        llon = subsetted_tree[lon_var_name]
     else:
         try:
             msk = np.logical_not(np.isnan(var_ds.data.squeeze()))
-            llat = subsetted_ds_new[lat_var_name].where(msk)
-            llon = subsetted_ds_new[lon_var_name].where(msk)
+            llat = subsetted_tree[lat_var_name].where(msk)
+            llon = subsetted_tree[lon_var_name].where(msk)
         except ValueError:
-            llat = subsetted_ds_new[lat_var_name]
-            llon = subsetted_ds_new[lon_var_name]
+            llat = subsetted_tree[lat_var_name]
+            llon = subsetted_tree[lon_var_name]
 
     lat_max = llat.max()
     lat_min = llat.min()
@@ -585,8 +928,8 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
     lon_min = (lon_min + 180) % 360 - 180
     lon_max = (lon_max + 180) % 360 - 180
 
-    lat_var_fill_value = subsetted_ds_new[lat_var_name].encoding.get('_FillValue')
-    lon_var_fill_value = subsetted_ds_new[lon_var_name].encoding.get('_FillValue')
+    lat_var_fill_value = subsetted_tree[lat_var_name].encoding.get('_FillValue')
+    lon_var_fill_value = subsetted_tree[lon_var_name].encoding.get('_FillValue')
 
     partial_pass = False
     if lat_var_fill_value:
@@ -614,17 +957,30 @@ def test_spatial_subset(collection_concept_id, env, granule_json, collection_var
         if not np.any(valid_lon) or not np.any(valid_lat):
             pytest.fail("No data in lon and lat")
 
-@pytest.mark.timeout(1200)
+@pytest.mark.timeout(1800)
 def test_temporal_subset(collection_concept_id, env, granule_json, collection_variables,
-                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_temporal):
-    test_spatial_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
+                        harmony_env, tmp_path: pathlib.Path, bearer_token_manager, skip_temporal, overrides):
+    test_temporal_subset.__doc__ = f"Verify temporal subset for {collection_concept_id} in {env}"
 
-    if collection_concept_id in skip_temporal:
+    collection_overrides = resolve_overrides(overrides, collection_concept_id)
+    if not should_run_generic("temporal", collection_overrides):
+        pytest.skip(f"Generic temporal disabled for {collection_concept_id}")
+
+    custom_tests = find_custom_tests(collection_concept_id, env)
+    if (custom_tests.get("collection") or custom_tests.get("group")) and not collection_overrides.get("also_run_generic", False):
+        pytest.skip(f"Custom collection/group tests present; skipping generic temporal for {collection_concept_id}")
+    if custom_tests.get("provider") and collection_overrides.get("replace_generic", False):
+        pytest.skip(f"Custom provider tests present; skipping generic temporal for {collection_concept_id}")
+
+    if collection_overrides.get("skip_temporal"):
+        pytest.skip(f"Temporal override skip for {collection_concept_id}")
+    if collection_concept_id in skip_temporal and not collection_overrides.get("force_temporal"):
         pytest.skip(f"Known collection to skip for temporal testing {collection_concept_id}")
 
     start_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
     end_time = granule_json['umm']["TemporalExtent"]["RangeDateTime"]["EndingDateTime"]
-    temporal_subset = get_half_temporal_extent(start_time, end_time)
+    temporal_fraction = collection_overrides.get("temporal_fraction", DEFAULT_TEMPORAL_FRACTION)
+    temporal_subset = get_middle_temporal_extent(start_time, end_time, float(temporal_fraction))
     
     request_collection = harmony.Collection(id=collection_concept_id)
     harmony_request = harmony.Request(collection=request_collection,
@@ -646,4 +1002,3 @@ def test_temporal_subset(collection_concept_id, env, granule_json, collection_va
                 logging.info("Auth error while running Harmony request. Refreshing token and retrying once.")
                 continue
             raise
-
