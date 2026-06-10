@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     # Print each open pull request title and URL
     for pull in open_pulls:
-        if pull.title not in new_collection_titles:
+        if pull.title not in new_collection_titles and any(label.name == 'autotest' for label in pull.labels):
             # Close the pull request
             pull.edit(state='closed')
             print(f"Pull Request #{pull.number}: {pull.title} have been closed")
