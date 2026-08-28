@@ -12,21 +12,43 @@ import sys
 from datetime import datetime, timedelta
 
 import requests
+from requests.adapters import HTTPAdapter
 from requests.auth import HTTPBasicAuth
+from urllib3.util.retry import Retry
 
 HEADERS = {"Accept": "application/json"}
+
+MAX_RETRIES = 5
+BACKOFF_FACTOR = 3
+RETRY_STATUS_CODES = (429, 500, 502, 503, 504)
+
+
+def _session_with_retry():
+    session = requests.Session()
+    retry = Retry(
+        total=MAX_RETRIES,
+        backoff_factor=BACKOFF_FACTOR,
+        status_forcelist=RETRY_STATUS_CODES,
+        allowed_methods=["GET", "POST"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
 def get_and_clean_existing_tokens(username, password, tokens_url, delete_token_url):
     """
     Fetches existing tokens, and only deletes tokens expiring within a day
     when there are two or more such tokens. Returns a valid token if one exists.
     """
-    get_response = requests.get(tokens_url, headers=HEADERS, auth=HTTPBasicAuth(username, password))
-    
+    session = _session_with_retry()
+    get_response = session.get(tokens_url, headers=HEADERS, auth=HTTPBasicAuth(username, password))
+
     # If the endpoint fails or returns no tokens, return None
     if get_response.status_code != 200:
         return None
-        
+
     existing_tokens = get_response.json()
     if not isinstance(existing_tokens, list):
         return None
@@ -35,34 +57,34 @@ def get_and_clean_existing_tokens(username, password, tokens_url, delete_token_u
     expiring_soon_tokens = []
     now = datetime.now()
     one_day_from_now = now + timedelta(days=1)
-    
+
     for token_info in existing_tokens:
         access_token = token_info.get("access_token")
         exp_date_str = token_info.get("expiration_date")
-        
+
         if access_token and exp_date_str:
             try:
                 # Parse the date format "MM/DD/YYYY"
                 exp_date = datetime.strptime(exp_date_str, "%m/%d/%Y")
-                
+
                 if exp_date <= one_day_from_now:
                     expiring_soon_tokens.append(access_token)
                 else:
                     # Save the first healthy token we find to return later
                     if not valid_token:
                         valid_token = access_token
-                        
+
             except ValueError:
                 pass
 
     if len(expiring_soon_tokens) >= 2:
         for access_token in expiring_soon_tokens:
-            requests.post(
+            session.post(
                 f"{delete_token_url}={access_token}",
                 headers=HEADERS,
                 auth=HTTPBasicAuth(username, password),
             )
-                
+
     return valid_token
 
 def generate_edl_token(env):
@@ -101,12 +123,13 @@ def generate_edl_token(env):
 
     # Step 1: Clean up old tokens and look for a valid one
     existing_valid_token = get_and_clean_existing_tokens(username, password, tokens_url, delete_token_url)
-    
+
     if existing_valid_token:
         return existing_valid_token
 
     # Step 2: If no healthy tokens exist, generate a new one
-    post_response = requests.post(token_url, headers=HEADERS, auth=HTTPBasicAuth(username, password))
+    session = _session_with_retry()
+    post_response = session.post(token_url, headers=HEADERS, auth=HTTPBasicAuth(username, password))
     token_data = post_response.json()
     
     if "error" in token_data: 
