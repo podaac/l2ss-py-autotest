@@ -14,18 +14,18 @@ harmony-py = "^1.2.0"
 matplotlib = "^3.7.2"
 netCDF4 = "^1.6.4"
 xarray = "^2025.1.0"
-cf-xarray = "^0.10.0"
-l2ss-py = "^3.3.1"
+cf-xarray = "^0.11.3"
+l2ss-py = "^3.3.2"
 pygithub = "^2.4.0"
 pytest-xdist = "^3.6.1"
-groq = "^0.13.1"
+groq = "^1.7.0"
 boto3 = "^1.38.36"
 junitparser = "^3.2.0"
 pyaml = "^26.2.1"
 podaac-agents = {git = "https://github.com/podaac/podaac-agents.git"}
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.1"
+pytest = "^9.1.1"
 pytest-html = "^4.1.1"
 pytest-timeout = "^2.1.0"
 
