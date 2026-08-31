@@ -597,22 +597,33 @@ def process_one_failure(
         return failure_record, issue_number, is_no_association, section
 
     # concept_id is in current_associations: create or update GitHub issue
-    response = stack_trace_agent(fail["message"])
-    solution = response.structured_output.suggested_solution
-    wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
-    short_summary = response.structured_output.short_summary
-    detailed_summary = response.structured_output.detailed_summary
-    wrapped_detailed_summary = "\n".join(textwrap.wrap(detailed_summary, width=100))
+    try:
+        response = stack_trace_agent(fail["message"])
+        solution = response.structured_output.suggested_solution
+        wrapped_solution = "\n".join(textwrap.wrap(solution, width=100))
+        short_summary = response.structured_output.short_summary
+        detailed_summary = response.structured_output.detailed_summary
+        wrapped_detailed_summary = "\n".join(textwrap.wrap(detailed_summary, width=100))
 
-    section = (
-        f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
-        f"**Error Message:**\n"
-        f"```text\n{fail.get('message', '').strip()}\n```\n"
-        f"**Summary:**\n"
-        f"```text\n{wrapped_detailed_summary}\n```\n"
-        f"**Suggested Solution:**\n"
-        f"```text\n{wrapped_solution}\n```\n"
-    )
+        section = (
+            f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
+            f"**Error Message:**\n"
+            f"```text\n{fail.get('message', '').strip()}\n```\n"
+            f"**Summary:**\n"
+            f"```text\n{wrapped_detailed_summary}\n```\n"
+            f"**Suggested Solution:**\n"
+            f"```text\n{wrapped_solution}\n```\n"
+        )
+    except Exception:
+        short_summary = ""
+        solution = ""
+        section = (
+            f"### Concept ID: `{concept_id}` | Short Name: `{short_name}` | Test Type: `{test_type}`\n"
+            f"**Error Message:**\n"
+            f"```text\n{fail.get('message', '').strip()}\n```\n"
+            f"**Summary:**\n"
+            f"```text\nLLM agent failed to summarize this error.\n```\n"
+        )
 
     if repo and token:
         title = f"Regression Failure: {env} | {concept_id} | {short_name}"
