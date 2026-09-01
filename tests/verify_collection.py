@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 import pathlib
 import shutil
 from typing import List, Dict, Optional, Tuple
@@ -589,8 +590,9 @@ def original_granule_localpath(granule_json: dict, tmp_path, authed_request) -> 
 
 @pytest.fixture(scope="function")
 def collection_variables(cmr_mode, collection_concept_id, env, bearer_token_manager):
-    for attempt in range(2):
-        token = bearer_token_manager(refresh=(attempt == 1))
+    max_retries = 3
+    for attempt in range(max_retries):
+        token = bearer_token_manager(refresh=(attempt > 0))
         try:
             collection_query = cmr.queries.CollectionQuery(mode=cmr_mode)
             variable_query = cmr.queries.VariableQuery(mode=cmr_mode)
@@ -612,6 +614,12 @@ def collection_variables(cmr_mode, collection_concept_id, env, bearer_token_mana
                 variables.extend(json.loads(variables_items[0]).get('items'))
 
             return variables
+        except requests.exceptions.ConnectionError as e:
+            if attempt < max_retries - 1:
+                logging.warning(f"Connection error querying collection variables (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {2 ** attempt}s...")
+                time.sleep(2 ** attempt)
+                continue
+            raise
         except Exception as e:
             if attempt == 0 and is_auth_error(e):
                 logging.info("Auth error while querying collection variables. Refreshing token and retrying once.")
